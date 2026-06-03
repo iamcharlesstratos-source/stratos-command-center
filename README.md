@@ -232,6 +232,7 @@ js/
   config.js           DEFAULT_CONFIG (thresholds, weights, AI settings) + merge helper
   metrics.js          Pure metric/ranking/labeling functions
   ai.js               AIService.generate() — direct + proxy backends
+  sync.js             Optional Supabase Cloud Sync (shared team data; opt-in)
   ui.js               Shared DOM helpers: el(), pills, sortable tables, modal, toast
   util.js             uid, date helpers, number formatting, escapeHtml
   modules/            One file per module view (products, creatives, daily, pages, content, competitors)
