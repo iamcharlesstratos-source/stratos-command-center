@@ -440,6 +440,29 @@ export function sparkline(values, { width = 84, height = 24, color = '#8B5CF6', 
 }
 
 // ---------------------------------------------------------------------------
+// Popover menu (anchored dropdown) — used to condense the toolbar
+// ---------------------------------------------------------------------------
+export function popoverMenu(anchor, items) {
+  const r = anchor.getBoundingClientRect();
+  const menu = el('div', { class: 'popover-menu', style: { position: 'fixed', top: (r.bottom + 6) + 'px', right: Math.max(8, window.innerWidth - r.right) + 'px' } });
+  const close = () => { menu.remove(); document.removeEventListener('keydown', onKey, true); document.removeEventListener('mousedown', onOut, true); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const onOut = (e) => { if (!menu.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) close(); };
+  items.forEach((it) => {
+    if (it.divider) { menu.appendChild(el('div', { class: 'popover-menu__divider' })); return; }
+    const row = el('button', { type: 'button', class: 'popover-menu__item' },
+      el('span', { text: it.label }),
+      it.hint ? el('span', { class: 'popover-menu__hint', text: it.hint }) : null);
+    row.addEventListener('click', () => { close(); if (it.onClick) it.onClick(); });
+    menu.appendChild(row);
+  });
+  document.addEventListener('keydown', onKey, true);
+  setTimeout(() => document.addEventListener('mousedown', onOut, true), 0);
+  document.body.appendChild(menu);
+  return { close };
+}
+
+// ---------------------------------------------------------------------------
 // Charts (pure SVG, no dependency)
 // ---------------------------------------------------------------------------
 function svgEl(tag, attrs = {}) {

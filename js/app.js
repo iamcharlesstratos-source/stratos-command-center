@@ -6,7 +6,7 @@ import * as store from './store.js';
 import * as metrics from './metrics.js';
 import * as ai from './ai.js';
 import * as sync from './sync.js';
-import { el, clear, button, openModal, confirmDialog, toast, field, input, pageHeader } from './ui.js';
+import { el, clear, button, openModal, confirmDialog, toast, field, input, pageHeader, popoverMenu } from './ui.js';
 import { todayStr } from './util.js';
 
 // Module views (each exports `render(view, params)`).
@@ -269,19 +269,9 @@ function openSyncSettings() {
   });
 }
 
-// header sync chip (inserted before the AI Settings button)
-const syncBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnSync', title: 'Cloud Sync', onClick: openSyncSettings, html: '<span class="chip__dot chip__dot--neutral" id="syncDot" style="margin-right:2px"></span><span id="syncLbl">Sync</span>' });
-document.querySelector('.topbar__actions').insertBefore(syncBtn, document.getElementById('btnAiSettings'));
-function updateSyncChip(st) {
-  const labels = { off: 'Sync off', connecting: 'Connecting…', syncing: 'Syncing…', synced: 'Synced', error: 'Sync error' };
-  const tones = { off: 'neutral', connecting: 'warn', syncing: 'warn', synced: 'good', error: 'bad' };
-  const lbl = syncBtn.querySelector('#syncLbl'); const dot = syncBtn.querySelector('#syncDot');
-  if (lbl) lbl.textContent = labels[st.status] || 'Sync';
-  if (dot) dot.className = 'chip__dot chip__dot--' + (tones[st.status] || 'neutral');
-  syncBtn.style.marginRight = '0';
-  syncBtn.title = 'Cloud Sync' + (st.detail ? ' — ' + st.detail : '');
-}
-sync.onStatus(updateSyncChip);
+// Cloud Sync status is surfaced in the ⋯ menu (see toolbar build below).
+let syncStatus = { status: 'off', detail: '' };
+sync.onStatus((st) => { syncStatus = st; });
 
 // ---------------------------------------------------------------------------
 // View preferences — light/dark theme + comfortable/compact density
@@ -387,6 +377,18 @@ document.addEventListener('keydown', (e) => {
 });
 const searchBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnSearch', title: 'Search / jump (Ctrl-K)', onClick: openCommandPalette, html: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span style="margin-left:6px;opacity:.65;font-size:11px">⌘K</span>' });
 _actions.insertBefore(searchBtn, _actions.firstChild);
+
+// Condense the toolbar: fold Import / Export / Cloud Sync / AI Settings into a ⋯ menu.
+['btnImport', 'btnExport', 'btnAiSettings'].forEach((id) => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+const moreBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnMore', title: 'More', html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>' });
+moreBtn.addEventListener('click', () => popoverMenu(moreBtn, [
+  { label: 'Import backup', onClick: () => document.getElementById('importFile').click() },
+  { label: 'Export backup', onClick: doExport },
+  { divider: true },
+  { label: 'Cloud Sync', hint: syncStatus.status, onClick: openSyncSettings },
+  { label: 'AI Settings', onClick: openAiSettings },
+]));
+_actions.appendChild(moreBtn);
 
 // expose for modules that need to open settings (e.g. AI buttons before config)
 // and as a debugging affordance for this internal tool.

@@ -8,6 +8,12 @@ proxy/node_modules/
 # Backups exported from the app
 stratos-backup-*.json
 
+# AI proxy secret — NEVER commit the key
+.ai_key
+proxy/.ai_key
+*.key
+.env
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db
