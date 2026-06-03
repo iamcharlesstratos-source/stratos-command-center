@@ -1,0 +1,14 @@
+# Local dev tooling (no-cache preview server + launch config) — not needed in deploy
+.claude/
+
+# Dependencies
+node_modules/
+proxy/node_modules/
+
+# Backups exported from the app
+stratos-backup-*.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log

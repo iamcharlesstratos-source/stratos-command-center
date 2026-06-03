@@ -1,0 +1,17 @@
+{
+  "name": "stratos-ai-proxy",
+  "version": "1.0.0",
+  "description": "Local proxy that holds the Anthropic API key server-side for the STRATOS Command Center.",
+  "private": true,
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
