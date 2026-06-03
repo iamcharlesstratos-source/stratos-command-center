@@ -53,6 +53,15 @@ export const DEFAULT_CONFIG = {
     language: 'Taglish',                      // default output language: Taglish | English | Tagalog
   },
 
+  // ---- Cloud Sync (shared team data via Supabase REST; opt-in) ----
+  // Only the DATA collections sync — config (incl. the AI key) stays local per user.
+  sync: {
+    enabled: false,
+    url: '',           // e.g. https://xxxxxxxx.supabase.co
+    anonKey: '',       // Supabase anon/public key (RLS-guarded)
+    pollSeconds: 5,    // how often to pull teammates' changes
+  },
+
   // ---- meta ----
   version: 1,
 };

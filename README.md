@@ -107,6 +107,52 @@ The header has **Export** (downloads all data as `stratos-backup-YYYYMMDD.json`)
 
 ---
 
+## Deploying (live, auto-updating)
+
+The app is a no-build static site, so it deploys to any static host. It ships with a
+**GitHub Pages** workflow (`.github/workflows/deploy.yml`) for continuous deploy:
+
+1. One-time: `winget install --id GitHub.cli -e` then `gh auth login` (GitHub.com → web browser).
+2. `gh repo create stratos-command-center --public --source=. --remote=origin --push`
+3. In the repo: **Settings → Pages → Source = "GitHub Actions"** (the workflow does the rest).
+
+After that, **every `git push` to `main` redeploys automatically** → `https://<user>.github.io/stratos-command-center/`.
+(Netlify/Vercel/Cloudflare Pages also work — point them at the repo; no build command, publish dir = root.)
+
+> Static hosts can't run the Node AI proxy, so on Pages use **direct** AI mode (each person's
+> own key, stored only in their browser) or host `proxy/server.js` separately (Render/Railway/Worker).
+
+## Shared team data (Cloud Sync via Supabase)
+
+By default data is per-browser `localStorage`. To make the **whole team share one dataset**, the
+app has an opt-in **Cloud Sync** (header → ☁ **Sync**) backed by Supabase's REST API — no SDK, no
+server to run. It mirrors your data collections to one cloud record; teammates poll and stay in sync.
+
+**Setup (≈1 minute, free):**
+1. Create a project at [supabase.com](https://supabase.com).
+2. **SQL Editor** → run:
+   ```sql
+   create table if not exists stratos_kv (
+     key text primary key,
+     value jsonb,
+     updated_at timestamptz default now()
+   );
+   alter table stratos_kv enable row level security;
+   create policy "stratos anon access" on stratos_kv
+     for all using (true) with check (true);
+   ```
+3. **Project Settings → API** → copy the **Project URL** and the **anon public** key.
+4. In the app: header **☁ Sync** → paste URL + key → toggle **On** → **Test connection** → **Save & connect**.
+5. Do step 4 once per teammate's browser (same URL + key) → everyone shares the same data.
+
+**Trade-offs (by design):**
+- **Last-write-wins** on the whole snapshot — great for a small, coordinated team; if two people
+  edit at the exact same time, the later save wins. Poll interval is configurable (default 5 s).
+- **Config stays local** — your AI key, thresholds, team list and sync creds are *never* uploaded,
+  so the key never reaches teammates. Only the data collections sync.
+- **Security:** the anon-all RLS policy means anyone with the URL + anon key can read/write that
+  table — fine for an internal team tool. For stricter control, add Supabase Auth + tighter RLS.
+
 ## Configurable thresholds (set during build, editable in-app)
 
 | Setting | Default | Where it's used |

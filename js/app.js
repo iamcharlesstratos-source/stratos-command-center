@@ -5,6 +5,7 @@
 import * as store from './store.js';
 import * as metrics from './metrics.js';
 import * as ai from './ai.js';
+import * as sync from './sync.js';
 import { el, clear, button, openModal, confirmDialog, toast, field, input, pageHeader } from './ui.js';
 import { todayStr } from './util.js';
 
@@ -233,9 +234,58 @@ function segmented(values, current, onPick) {
 
 document.getElementById('btnAiSettings').addEventListener('click', openAiSettings);
 
+// ---------------------------------------------------------------------------
+// Cloud Sync (shared team data via Supabase) — settings modal + header chip
+// ---------------------------------------------------------------------------
+function openSyncSettings() {
+  const cur = store.getConfig().sync || {};
+  const draft = { ...cur };
+  const enableSeg = segmented(['Off', 'On'], cur.enabled ? 'On' : 'Off', (v) => { draft.enabled = (v === 'On'); });
+  const urlInput = input({ value: cur.url || '', placeholder: 'https://xxxx.supabase.co', onInput: (e) => draft.url = e.target.value.trim() });
+  const keyInput = input({ value: cur.anonKey || '', placeholder: 'Supabase anon public key', onInput: (e) => draft.anonKey = e.target.value.trim() });
+  const pollInput = input({ type: 'number', value: cur.pollSeconds || 5, onInput: (e) => draft.pollSeconds = parseInt(e.target.value, 10) || 5 });
+  const testOut = el('div', { class: 'field__hint' });
+
+  const body = el('div', { class: 'stack' },
+    el('p', { class: 'field__hint', html: 'Shares your <b>data</b> (products, metrics, creatives…) across the team via Supabase. Your AI key &amp; thresholds stay local to this browser. <b>Last-write-wins</b> — coordinate large simultaneous edits. See the README for the 1-minute Supabase setup + SQL.' }),
+    field('Cloud Sync', enableSeg),
+    field('Supabase URL', urlInput),
+    field('Anon public key', keyInput, { hint: 'Supabase → Project Settings → API → "anon public". Safe for the browser when RLS is on.' }),
+    field('Poll interval (seconds)', pollInput),
+    el('div', { class: 'row', style: { gap: '8px' } }, button('Test connection', { variant: 'ghost', onClick: async () => {
+      store.updateConfig({ sync: { ...draft } }); testOut.textContent = 'Testing…';
+      const r = await sync.test();
+      testOut.innerHTML = r.ok ? `<b style="color:var(--good)">✓ ${r.detail}</b>` : `<b style="color:var(--bad)">✗ ${r.detail}</b>`;
+    } })),
+    testOut,
+  );
+
+  openModal({
+    title: 'Cloud Sync — shared team data', width: 600, body,
+    actions: [
+      { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
+      { label: 'Save & connect', variant: 'primary', onClick: (close) => { store.updateConfig({ sync: { ...draft } }); toast('Cloud Sync settings saved.', 'success'); close(); sync.start(renderRoute); } },
+    ],
+  });
+}
+
+// header sync chip (inserted before the AI Settings button)
+const syncBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnSync', title: 'Cloud Sync', onClick: openSyncSettings, html: '<span class="chip__dot chip__dot--neutral" id="syncDot" style="margin-right:2px"></span><span id="syncLbl">Sync</span>' });
+document.querySelector('.topbar__actions').insertBefore(syncBtn, document.getElementById('btnAiSettings'));
+function updateSyncChip(st) {
+  const labels = { off: 'Sync off', connecting: 'Connecting…', syncing: 'Syncing…', synced: 'Synced', error: 'Sync error' };
+  const tones = { off: 'neutral', connecting: 'warn', syncing: 'warn', synced: 'good', error: 'bad' };
+  const lbl = syncBtn.querySelector('#syncLbl'); const dot = syncBtn.querySelector('#syncDot');
+  if (lbl) lbl.textContent = labels[st.status] || 'Sync';
+  if (dot) dot.className = 'chip__dot chip__dot--' + (tones[st.status] || 'neutral');
+  syncBtn.style.marginRight = '0';
+  syncBtn.title = 'Cloud Sync' + (st.detail ? ' — ' + st.detail : '');
+}
+sync.onStatus(updateSyncChip);
+
 // expose for modules that need to open settings (e.g. AI buttons before config)
 // and as a debugging affordance for this internal tool.
-window.STRATOS = { openAiSettings, refreshChrome, renderRoute, store, metrics, ai };
+window.STRATOS = { openAiSettings, openSyncSettings, refreshChrome, renderRoute, store, metrics, ai, sync };
 
 // ---------------------------------------------------------------------------
 // Boot
@@ -243,3 +293,4 @@ window.STRATOS = { openAiSettings, refreshChrome, renderRoute, store, metrics, a
 if (!location.hash) location.replace('#/dashboard');
 refreshChrome();
 renderRoute();
+sync.start(renderRoute); // no-op until Cloud Sync is configured & enabled
