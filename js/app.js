@@ -283,9 +283,44 @@ function updateSyncChip(st) {
 }
 sync.onStatus(updateSyncChip);
 
+// ---------------------------------------------------------------------------
+// View preferences — light/dark theme + comfortable/compact density
+// ---------------------------------------------------------------------------
+const ICON_SUN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const ICON_MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const ICON_ROWS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>';
+
+function applyUiPrefs() {
+  const ui = store.getConfig().ui || {};
+  document.documentElement.dataset.theme = ui.theme === 'light' ? 'light' : 'dark';
+  document.body.classList.toggle('density-compact', ui.density === 'compact');
+}
+const themeBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnTheme', onClick: () => {
+  const ui = store.getConfig().ui || {};
+  store.updateConfig({ ui: { theme: ui.theme === 'light' ? 'dark' : 'light' } });
+  applyUiPrefs(); syncViewButtons();
+} });
+const densityBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnDensity', html: ICON_ROWS, onClick: () => {
+  const ui = store.getConfig().ui || {};
+  store.updateConfig({ ui: { density: ui.density === 'compact' ? 'comfortable' : 'compact' } });
+  applyUiPrefs(); syncViewButtons();
+} });
+function syncViewButtons() {
+  const ui = store.getConfig().ui || {};
+  themeBtn.innerHTML = ui.theme === 'light' ? ICON_MOON : ICON_SUN;
+  themeBtn.title = ui.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
+  densityBtn.title = ui.density === 'compact' ? 'Comfortable density' : 'Compact density';
+  densityBtn.style.opacity = ui.density === 'compact' ? '1' : '0.7';
+}
+const _actions = document.querySelector('.topbar__actions');
+_actions.insertBefore(densityBtn, _actions.firstChild);
+_actions.insertBefore(themeBtn, _actions.firstChild);
+syncViewButtons();
+applyUiPrefs();
+
 // expose for modules that need to open settings (e.g. AI buttons before config)
 // and as a debugging affordance for this internal tool.
-window.STRATOS = { openAiSettings, openSyncSettings, refreshChrome, renderRoute, store, metrics, ai, sync };
+window.STRATOS = { openAiSettings, openSyncSettings, applyUiPrefs, refreshChrome, renderRoute, store, metrics, ai, sync };
 
 // ---------------------------------------------------------------------------
 // Boot

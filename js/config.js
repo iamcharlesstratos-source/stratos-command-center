@@ -62,6 +62,12 @@ export const DEFAULT_CONFIG = {
     pollSeconds: 5,    // how often to pull teammates' changes
   },
 
+  // ---- UI preferences (theme + density) ----
+  ui: {
+    theme: 'dark',          // 'dark' | 'light'
+    density: 'comfortable', // 'comfortable' | 'compact'
+  },
+
   // ---- meta ----
   version: 1,
 };

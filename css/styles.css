@@ -10,8 +10,11 @@
   --surface-2: #1A2348;
   --border:    #2A3666;
   --text:      #E8ECFF;
-  --text-dim:  #8A93C2;
+  --text-dim:  #99A2CC;
   --grad:      linear-gradient(135deg, #4F7BFF 0%, #8B5CF6 50%, #EC4899 100%);
+  --accent:    #8B5CF6;                   /* solid accent — used where the gradient would be overkill */
+  --accent-2:  #4F7BFF;
+  --ring:      rgba(139, 92, 246, 0.55);  /* keyboard focus ring */
   --good:      #2DD4A7;
   --warn:      #F5B945;
   --bad:       #F4506B;
@@ -33,6 +36,11 @@
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
   --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.25);
 
+  /* theme-aware surfaces (flipped in light mode) */
+  --sidebar-bg: linear-gradient(180deg, rgba(17, 25, 54, 0.95), rgba(10, 16, 41, 0.95));
+  --topbar-bg: rgba(10, 16, 41, 0.6);
+  --zebra: rgba(26, 35, 72, 0.35);
+
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, system-ui, sans-serif;
   --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
@@ -47,6 +55,7 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;     /* aligned figures — critical for a metrics tool */
 }
 /* subtle cosmic backdrop */
 body::before {
@@ -76,7 +85,7 @@ button { font-family: inherit; }
 .sidebar {
   width: var(--sidebar-w);
   flex: 0 0 var(--sidebar-w);
-  background: linear-gradient(180deg, rgba(17, 25, 54, 0.95), rgba(10, 16, 41, 0.95));
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
   padding: 18px 12px;
   position: sticky; top: 0; height: 100vh;
@@ -117,7 +126,7 @@ button { font-family: inherit; }
 .topbar {
   display: flex; align-items: center; gap: 16px;
   padding: 14px 24px; border-bottom: 1px solid var(--border);
-  background: rgba(10, 16, 41, 0.6); backdrop-filter: blur(8px);
+  background: var(--topbar-bg); backdrop-filter: blur(8px);
   position: sticky; top: 0; z-index: 20;
 }
 .topbar__accent { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--grad); opacity: .8; }
@@ -190,7 +199,7 @@ button { font-family: inherit; }
 }
 .card + .card { margin-top: var(--gap); }
 .card__title { font-size: 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
-.card__title::before { content: ''; width: 4px; height: 16px; border-radius: 3px; background: var(--grad); }
+.card__title::before { content: ''; width: 3px; height: 15px; border-radius: 3px; background: var(--accent); }
 
 .grid { display: grid; gap: var(--gap); }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
@@ -301,7 +310,7 @@ button { font-family: inherit; }
 .th--sortable:hover { color: var(--text); }
 .th__caret { margin-left: 5px; font-size: 9px; color: #8B5CF6; }
 .data-table tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.data-table tbody tr:nth-child(even) { background: rgba(26, 35, 72, 0.35); }
+.data-table tbody tr:nth-child(even) { background: var(--zebra); }
 .data-table tbody tr:hover { background: var(--surface-2); }
 .data-table tbody tr:last-child td { border-bottom: none; }
 .row--click { cursor: pointer; }
@@ -381,9 +390,77 @@ button { font-family: inherit; }
   .nav__num { display: none; }
   .nav__spacer, .nav__foot { display: none; }
   .form-grid { grid-template-columns: 1fr; }
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 640px) {
-  .topbar { flex-wrap: wrap; }
-  .view { padding: 16px; }
+  .topbar { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
+  .topbar__chips { order: 3; width: 100%; }
+  .view { padding: 14px; }
+  .page-title { font-size: 19px; }
+  .page-head { gap: 10px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-tile { padding: 12px; }
+  .stat-tile__value { font-size: 21px; }
+  .modal { max-height: 92vh; }
 }
+@media (max-width: 430px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+}
+
+/* =========================================================================
+   Design polish — focus rings, reduced motion, density, big numbers
+   ========================================================================= */
+:focus-visible { outline: none; }
+.btn:focus-visible, .modal__close:focus-visible, .segmented button:focus-visible,
+.nav__item:focus-visible, a.card:focus-visible, .chip:focus-visible, select:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring); position: relative; z-index: 1;
+}
+a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+.check:focus-within { background: var(--surface-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important;
+  }
+}
+
+/* compact density (header toggle adds body.density-compact) */
+body.density-compact .data-table thead th { padding: 7px 12px; }
+body.density-compact .data-table tbody td { padding: 6px 12px; font-size: 12.5px; }
+body.density-compact .card { padding: 14px; }
+body.density-compact .card + .card { margin-top: 12px; }
+body.density-compact .stat-tile { padding: 12px; }
+body.density-compact .stat-tile__value { font-size: 22px; }
+body.density-compact .btn { padding: 6px 11px; }
+
+/* authoritative figures */
+.stat-tile__value, .page-title { font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
+
+/* =========================================================================
+   Light theme — flips tokens; gradient + accent stay
+   ========================================================================= */
+:root[data-theme="light"] {
+  --bg: #F3F5FC;
+  --surface: #FFFFFF;
+  --surface-2: #EDF1FB;
+  --border: #DCE3F4;
+  --text: #16203F;
+  --text-dim: #5C6688;
+  --good: #119C77; --warn: #B5810F; --bad: #D8364F;
+  --good-bg: rgba(17, 156, 119, 0.12);
+  --warn-bg: rgba(181, 129, 15, 0.12);
+  --bad-bg: rgba(216, 54, 79, 0.12);
+  --neutral-bg: rgba(92, 102, 136, 0.12);
+  --shadow: 0 10px 30px rgba(30, 45, 90, 0.10);
+  --shadow-sm: 0 2px 10px rgba(30, 45, 90, 0.07);
+  --sidebar-bg: linear-gradient(180deg, #FFFFFF, #F4F7FF);
+  --topbar-bg: rgba(255, 255, 255, 0.72);
+  --zebra: rgba(30, 45, 90, 0.035);
+}
+:root[data-theme="light"] body::before {
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgba(139, 92, 246, 0.10), transparent 60%),
+    radial-gradient(700px 500px at -10% 110%, rgba(79, 123, 255, 0.08), transparent 55%);
+}
+:root[data-theme="light"] .data-table tbody tr:hover { background: #EFF3FE; }
