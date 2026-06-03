@@ -168,11 +168,12 @@ function openAiSettings() {
   const cfg = store.getConfig();
   const ai = cfg.ai;
 
-  const backendSeg = segmented(['auto', 'direct', 'proxy'], ai.backend, (v) => { state.backend = v; renderHint(); });
+  const backendSeg = segmented(['auto', 'groq', 'proxy', 'direct'], ai.backend, (v) => { state.backend = v; renderHint(); });
   const langSeg = segmented(['Taglish', 'English', 'Tagalog'], ai.language, (v) => { state.language = v; });
 
   const state = { ...ai };
 
+  const groqKeyInput = input({ type: 'password', value: ai.groqKey || '', placeholder: 'gsk_…', onInput: (e) => state.groqKey = e.target.value.trim() });
   const keyInput = input({ type: 'password', value: ai.apiKey, placeholder: 'sk-ant-...', onInput: (e) => state.apiKey = e.target.value });
   const proxyInput = input({ value: ai.proxyUrl, placeholder: 'http://localhost:8787/ai', onInput: (e) => state.proxyUrl = e.target.value });
   const copyModelInput = input({ value: ai.copyModel, onInput: (e) => state.copyModel = e.target.value });
@@ -181,16 +182,18 @@ function openAiSettings() {
 
   const hint = el('p', { class: 'field__hint' });
   function renderHint() {
-    if (state.backend === 'direct') hint.innerHTML = '⚠️ <b>Direct mode is internal-use only.</b> Your API key is stored in this browser\'s localStorage and sent from the client — never deploy this publicly.';
-    else if (state.backend === 'proxy') hint.textContent = 'Proxy mode: requests go to your local endpoint, which holds the key server-side (see /proxy/server.js).';
-    else hint.textContent = 'Auto: use the proxy if a Proxy URL is set, otherwise fall back to a direct browser call.';
+    if (state.backend === 'groq') hint.innerHTML = '✅ <b>Groq mode (recommended) — FREE, no proxy.</b> Calls Groq directly from the browser. Get a free key (no card) at <b>console.groq.com/keys</b>. Key stays in this browser only.';
+    else if (state.backend === 'direct') hint.innerHTML = '⚠️ <b>Anthropic direct — internal-use only.</b> Your key is stored in this browser and sent from the client.';
+    else if (state.backend === 'proxy') hint.textContent = 'Proxy mode: requests go to your local proxy (run start-ai-proxy.bat). Holds the key server-side.';
+    else hint.textContent = 'Auto: uses your Groq key if set (free, no proxy), else a configured proxy, else Anthropic direct.';
   }
   renderHint();
 
   const body = el('div', { class: 'stack' },
-    field('Backend', backendSeg, { hint: 'How AI requests are sent.' }),
+    field('🆓 Groq key (free — recommended)', groqKeyInput, { hint: 'Get one in 30s at console.groq.com/keys — works instantly, no terminal/proxy needed.' }),
+    field('Backend', backendSeg, { hint: 'How AI requests are sent. "auto" just uses your Groq key.' }),
     hint,
-    field('Anthropic API key (direct mode)', keyInput, { hint: 'Stored client-side. Used only for direct calls.' }),
+    field('Anthropic API key (direct mode)', keyInput, { hint: 'Optional. Stored client-side. Used only for Anthropic direct calls.' }),
     field('Proxy URL (proxy mode)', proxyInput),
     el('div', { class: 'form-grid' },
       field('Copy model', copyModelInput, { hint: 'Used for briefs, captions, scripts.' }),

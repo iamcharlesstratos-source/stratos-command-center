@@ -19,14 +19,20 @@ export function getAiConfig() { return store.getConfig().ai; }
 
 /** Which backend will actually be used right now. */
 export function resolveBackend(ai = getAiConfig()) {
+  if (ai.backend === 'groq') return 'groq';
   if (ai.backend === 'direct') return 'direct';
   if (ai.backend === 'proxy') return 'proxy';
-  return ai.proxyUrl ? 'proxy' : 'direct'; // auto
+  // auto: prefer the FREE Groq key, then a configured proxy, then Anthropic direct
+  if (ai.groqKey) return 'groq';
+  return ai.proxyUrl ? 'proxy' : 'direct';
 }
 
 /** Is the resolved backend usable (has the credential/URL it needs)? */
 export function isConfigured(ai = getAiConfig()) {
-  return resolveBackend(ai) === 'proxy' ? !!ai.proxyUrl : !!ai.apiKey;
+  const b = resolveBackend(ai);
+  if (b === 'groq') return !!ai.groqKey;
+  if (b === 'proxy') return !!ai.proxyUrl;
+  return !!ai.apiKey;
 }
 
 /**
@@ -40,12 +46,41 @@ export async function generate(systemPrompt, userPrompt, opts = {}) {
   const backend = resolveBackend(ai);
   const payload = { model, max_tokens: maxTokens, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] };
 
+  if (backend === 'groq') {
+    if (!ai.groqKey) throw new Error('No Groq key set. Open AI Settings → paste your free key from console.groq.com/keys.');
+    return groqCall(ai, payload);
+  }
   if (backend === 'direct') {
-    if (!ai.apiKey) throw new Error('No API key set. Open AI Settings → add a key, or switch to proxy mode.');
+    if (!ai.apiKey) throw new Error('No Anthropic key set. Open AI Settings → add a key, or use the free Groq mode.');
     return directCall(ai, payload);
   }
-  if (!ai.proxyUrl) throw new Error('No proxy URL set. Open AI Settings → set the proxy URL, or switch to direct mode.');
+  if (!ai.proxyUrl) throw new Error('No proxy URL set. Open AI Settings → use the free Groq mode, or set a proxy URL.');
   return proxyCall(ai, payload);
+}
+
+/** Direct browser call to Groq's OpenAI-compatible API (free; CORS-enabled). */
+async function groqCall(ai, payload) {
+  const messages = [];
+  if (payload.system) messages.push({ role: 'system', content: String(payload.system) });
+  for (const m of (payload.messages || [])) {
+    const content = Array.isArray(m.content) ? m.content.map((c) => c.text || '').join('\n') : String(m.content || '');
+    messages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content });
+  }
+  let res;
+  try {
+    res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${ai.groqKey}` },
+      body: JSON.stringify({ model: ai.groqModel || 'llama-3.3-70b-versatile', messages, max_tokens: payload.max_tokens || 1024, temperature: 0.8 }),
+    });
+  } catch (err) {
+    throw new Error(`Network error reaching Groq. Check your connection. (${err.message})`);
+  }
+  if (!res.ok) throw new Error(await apiError(res));
+  const data = await res.json();
+  const text = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (!text) throw new Error('Empty response from Groq.');
+  return text.trim();
 }
 
 async function directCall(ai, payload) {

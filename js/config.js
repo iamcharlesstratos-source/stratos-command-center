@@ -44,11 +44,13 @@ export const DEFAULT_CONFIG = {
 
   // ---- AI settings (consumed by ai.js in Phase 4) ----
   ai: {
-    backend: 'auto',                          // 'auto' | 'direct' | 'proxy'
-    apiKey: '',                               // client-side, internal-use only (direct mode)
+    backend: 'auto',                          // 'auto' | 'groq' | 'proxy' | 'direct'
+    groqKey: '',                              // FREE Groq key (console.groq.com/keys) — direct browser calls, no proxy
+    groqModel: 'llama-3.3-70b-versatile',     // Groq model used in groq mode
+    apiKey: '',                               // Anthropic key, client-side, internal-use only (direct mode)
     proxyUrl: 'http://localhost:8787/ai',     // server-side key (proxy mode)
-    copyModel: 'claude-sonnet-4-6',           // default model for copy
-    bulkModel: 'claude-haiku-4-5-20251001',   // cheaper model for bulk hook generation
+    copyModel: 'claude-sonnet-4-6',           // default Anthropic model for copy
+    bulkModel: 'claude-haiku-4-5-20251001',   // cheaper Anthropic model for bulk hook generation
     maxTokens: 1024,
     language: 'Taglish',                      // default output language: Taglish | English | Tagalog
   },
