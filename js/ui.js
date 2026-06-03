@@ -394,4 +394,77 @@ export function sparkline(values, { width = 84, height = 24, color = '#8B5CF6', 
   return svg;
 }
 
+// ---------------------------------------------------------------------------
+// Charts (pure SVG, no dependency)
+// ---------------------------------------------------------------------------
+function svgEl(tag, attrs = {}) {
+  const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  return n;
+}
+
+/**
+ * Multi-series line chart. datasets: [{ name, color, values:[number|null] }].
+ * opts: { width, height, labels:[xLabels], fmt:(v)=>string }. Returns a wrapper node.
+ */
+export function lineChart(datasets, { width = 560, height = 170, labels = [], fmt = (v) => v } = {}) {
+  const pad = 26;
+  const all = datasets.flatMap((d) => d.values).filter((v) => Number.isFinite(v));
+  const min = Math.min(0, ...(all.length ? all : [0]));
+  const max = Math.max(1, ...(all.length ? all : [1]));
+  const range = max - min || 1;
+  const n = Math.max(1, ...datasets.map((d) => d.values.length));
+  const innerW = width - pad * 2, innerH = height - pad * 2;
+  const X = (i) => pad + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+  const Y = (v) => pad + innerH - ((v - min) / range) * innerH;
+
+  const svg = svgEl('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', height });
+  svg.style.display = 'block'; svg.style.maxWidth = '100%';
+  for (let g = 0; g <= 3; g++) {
+    const gy = pad + (g / 3) * innerH;
+    svg.appendChild(svgEl('line', { x1: pad, y1: gy, x2: width - pad, y2: gy, stroke: 'var(--border)', 'stroke-width': 1, opacity: 0.45 }));
+    svg.appendChild(svgEl('text', { x: 4, y: gy + 3, fill: 'var(--text-dim)', 'font-size': 9 })).textContent = fmt(max - (g / 3) * range);
+  }
+  datasets.forEach((d) => {
+    const pts = d.values.map((v, i) => (Number.isFinite(v) ? { x: X(i), y: Y(v) } : null)).filter(Boolean);
+    if (!pts.length) return;
+    const dPath = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    svg.appendChild(svgEl('path', { d: dPath, fill: 'none', stroke: d.color || 'var(--accent)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    const last = pts[pts.length - 1];
+    svg.appendChild(svgEl('circle', { cx: last.x, cy: last.y, r: 3, fill: d.color || 'var(--accent)' }));
+  });
+  // x-axis end labels
+  if (labels.length) {
+    const lbl = (i, anchor, x) => { const t = svgEl('text', { x, y: height - 6, fill: 'var(--text-dim)', 'font-size': 9, 'text-anchor': anchor }); t.textContent = labels[i]; svg.appendChild(t); };
+    lbl(0, 'start', pad); lbl(labels.length - 1, 'end', width - pad);
+  }
+  const wrap = el('div', {});
+  if (datasets.some((d) => d.name)) {
+    const legend = el('div', { class: 'row', style: { gap: '14px', marginBottom: '6px', flexWrap: 'wrap' } });
+    datasets.forEach((d) => legend.appendChild(el('span', { class: 'muted', style: { fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' } },
+      el('span', { style: { width: '10px', height: '10px', borderRadius: '2px', background: d.color || 'var(--accent)', display: 'inline-block' } }), d.name)));
+    wrap.appendChild(legend);
+  }
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+/** Horizontal bar chart. items: [{ label, value, color, sub }]. Diverges around 0. */
+export function barChart(items, { fmt = (v) => v } = {}) {
+  const max = Math.max(1, ...items.map((i) => Math.abs(Number(i.value) || 0)));
+  const wrap = el('div', { class: 'stack', style: { gap: '8px' } });
+  items.forEach((it) => {
+    const v = Number(it.value) || 0;
+    const pct = Math.round((Math.abs(v) / max) * 100);
+    const row = el('div', { style: { display: 'grid', gridTemplateColumns: '90px 1fr auto', gap: '8px', alignItems: 'center' } },
+      el('span', { class: 'mono', style: { fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: it.label }),
+      el('div', { style: { height: '14px', background: 'var(--surface-2)', borderRadius: '7px', overflow: 'hidden' } },
+        el('div', { style: { height: '100%', width: pct + '%', background: it.color || (v < 0 ? 'var(--bad)' : 'var(--good)'), borderRadius: '7px' } })),
+      el('span', { class: 'mono', style: { fontSize: '12px', color: v < 0 ? 'var(--bad)' : 'var(--text)' }, text: fmt(v) }),
+    );
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
 export { escapeHtml };

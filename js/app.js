@@ -318,9 +318,79 @@ _actions.insertBefore(themeBtn, _actions.firstChild);
 syncViewButtons();
 applyUiPrefs();
 
+// ---------------------------------------------------------------------------
+// Command palette (⌘/Ctrl-K) — fast nav to modules, products & actions
+// ---------------------------------------------------------------------------
+let paletteOpen = false;
+function buildCommands() {
+  const go = (hash) => () => { location.hash = hash; };
+  const cmds = [
+    { icon: '▦', label: 'Dashboard', run: go('#/dashboard') },
+    { icon: '📦', label: 'Product Testing', run: go('#/products') },
+    { icon: '🎬', label: 'Creative Testing', run: go('#/creatives') },
+    { icon: '📊', label: 'Daily Dashboard', run: go('#/daily') },
+    { icon: '📄', label: 'Page Status', run: go('#/pages') },
+    { icon: '✨', label: 'AI Content', run: go('#/content') },
+    { icon: '🔍', label: 'Competitor Ads', run: go('#/competitors') },
+    { icon: '＋', label: 'New product', hint: 'go to products', run: go('#/products') },
+    { icon: '⬆', label: 'Export backup', run: () => document.getElementById('btnExport').click() },
+    { icon: '⬇', label: 'Import backup', run: () => document.getElementById('btnImport').click() },
+    { icon: '🤖', label: 'AI Settings', run: openAiSettings },
+    { icon: '☁', label: 'Cloud Sync settings', run: openSyncSettings },
+    { icon: '🌓', label: 'Toggle light / dark theme', run: () => themeBtn.click() },
+    { icon: '≣', label: 'Toggle density', run: () => densityBtn.click() },
+  ];
+  store.getProducts().forEach((p) => cmds.push({ icon: '•', label: `${p.code} — ${p.name || ''}`.trim(), hint: 'product', keywords: `${p.code} ${p.name || ''}`.toLowerCase(), run: () => { location.hash = '#/products/' + encodeURIComponent(p.code); } }));
+  return cmds;
+}
+function openCommandPalette() {
+  if (paletteOpen) return; paletteOpen = true;
+  const cmds = buildCommands();
+  let filtered = cmds, sel = 0;
+  const overlay = el('div', { class: 'modal-overlay' });
+  const box = el('div', { class: 'modal', style: { maxWidth: '560px', marginTop: '2vh' } });
+  const search = el('input', { class: 'input', placeholder: 'Jump to a module, product or action…', style: { border: 'none', borderRadius: '0', fontSize: '15px', padding: '16px 18px', background: 'transparent' } });
+  const listEl = el('div', { style: { maxHeight: '54vh', overflowY: 'auto', borderTop: '1px solid var(--border)' } });
+  box.appendChild(search); box.appendChild(listEl); overlay.appendChild(box);
+  function renderList() {
+    clear(listEl);
+    filtered.forEach((c, i) => {
+      const row = el('div', { style: { padding: '10px 18px', cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'center', background: i === sel ? 'var(--surface-2)' : 'transparent' } },
+        el('span', { style: { width: '18px', textAlign: 'center', opacity: '.85' }, text: c.icon || '›' }),
+        el('span', { text: c.label }),
+        c.hint ? el('span', { class: 'muted', style: { marginLeft: 'auto', fontSize: '11px' }, text: c.hint }) : null);
+      row.addEventListener('mouseenter', () => { sel = i; paint(); });
+      row.addEventListener('click', () => run(c));
+      listEl.appendChild(row);
+    });
+    if (!filtered.length) listEl.appendChild(el('div', { class: 'muted', style: { padding: '16px 18px' }, text: 'No matches.' }));
+  }
+  function paint() { [...listEl.children].forEach((r, i) => { r.style.background = i === sel ? 'var(--surface-2)' : 'transparent'; }); }
+  function filt() { const q = search.value.trim().toLowerCase(); filtered = q ? cmds.filter((c) => c.label.toLowerCase().includes(q) || (c.keywords || '').includes(q)) : cmds; sel = 0; renderList(); }
+  function run(c) { close(); c.run(); }
+  function close() { paletteOpen = false; document.removeEventListener('keydown', onKey, true); overlay.remove(); }
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(filtered.length - 1, sel + 1); paint(); listEl.children[sel]?.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(0, sel - 1); paint(); listEl.children[sel]?.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (filtered[sel]) run(filtered[sel]); }
+  }
+  search.addEventListener('input', filt);
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', onKey, true);
+  document.body.appendChild(overlay);
+  renderList();
+  setTimeout(() => search.focus(), 30);
+}
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openCommandPalette(); }
+});
+const searchBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnSearch', title: 'Search / jump (Ctrl-K)', onClick: openCommandPalette, html: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span style="margin-left:6px;opacity:.65;font-size:11px">⌘K</span>' });
+_actions.insertBefore(searchBtn, _actions.firstChild);
+
 // expose for modules that need to open settings (e.g. AI buttons before config)
 // and as a debugging affordance for this internal tool.
-window.STRATOS = { openAiSettings, openSyncSettings, applyUiPrefs, refreshChrome, renderRoute, store, metrics, ai, sync };
+window.STRATOS = { openAiSettings, openSyncSettings, openCommandPalette, applyUiPrefs, refreshChrome, renderRoute, store, metrics, ai, sync };
 
 // ---------------------------------------------------------------------------
 // Boot
