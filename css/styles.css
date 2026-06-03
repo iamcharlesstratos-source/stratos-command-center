@@ -3,6 +3,18 @@
    Dark, polished, gradient-accented. One stylesheet, CSS custom properties.
    ========================================================================= */
 
+/* Self-hosted display face for headings/brand (Space Grotesk, OFL — see /fonts) */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal; font-weight: 500; font-display: swap;
+  src: url('../fonts/space-grotesk-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('../fonts/space-grotesk-700.woff2') format('woff2');
+}
+
 :root {
   /* ---- palette (from brief) ---- */
   --bg:        #0A1029;
@@ -42,6 +54,7 @@
   --zebra: rgba(26, 35, 72, 0.35);
 
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
 
@@ -65,7 +78,8 @@ body::before {
     radial-gradient(900px 500px at 85% -10%, rgba(139, 92, 246, 0.18), transparent 60%),
     radial-gradient(700px 500px at -10% 110%, rgba(79, 123, 255, 0.16), transparent 55%);
 }
-h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; font-family: var(--font-display); }
+.brand__name, .page-title, .card__title, .modal__title { font-family: var(--font-display); }
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; }
 ::selection { background: rgba(139, 92, 246, 0.4); }
@@ -464,3 +478,23 @@ body.density-compact .btn { padding: 6px 11px; }
     radial-gradient(700px 500px at -10% 110%, rgba(79, 123, 255, 0.08), transparent 55%);
 }
 :root[data-theme="light"] .data-table tbody tr:hover { background: #EFF3FE; }
+
+/* =========================================================================
+   Identity motif + motion (reduced-motion neutralized above)
+   ========================================================================= */
+.orbital-mark svg { width: 100%; height: 100%; display: block; }
+.orbital-mark--spin .orbital-mark__rings { transform-origin: 24px 24px; animation: orbital-spin 2.6s linear infinite; }
+@keyframes orbital-spin { to { transform: rotate(360deg); } }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 38%, var(--surface-2) 63%);
+  background-size: 400% 100%; border-radius: 6px; animation: skeleton-shimmer 1.3s ease infinite;
+}
+@keyframes skeleton-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+.chart-rise { animation: stratos-rise .45s ease both; }
+@keyframes stratos-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* faint orbital watermark behind the dashboard hero */
+.hero-watermark { position: relative; }
+.hero-watermark .orbital-mark { position: absolute; right: 8px; top: -6px; pointer-events: none; z-index: 0; }

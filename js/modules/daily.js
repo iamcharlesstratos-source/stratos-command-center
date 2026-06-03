@@ -17,6 +17,11 @@ import { todayStr, yesterdayStr, toNum, debounce } from '../util.js';
 
 let selectedDate = todayStr();
 
+// subtle performance tints (work on both themes)
+const HEAT = { good: 'rgba(45,212,167,0.18)', warn: 'rgba(245,185,69,0.16)', bad: 'rgba(244,80,107,0.16)' };
+const roasHeat = (r, cfg) => { const l = metrics.labelForRoas(r, cfg.thresholds); return l === 'Scale' ? HEAT.good : l === 'Observe' ? HEAT.warn : l === 'Kill' ? HEAT.bad : null; };
+const profitHeat = (prof, spend) => { const l = metrics.profitLabel(prof, spend); return l === 'Profitable' ? HEAT.good : l === 'Breakeven' ? HEAT.warn : l === 'Bleeding' ? HEAT.bad : null; };
+
 export function render(view) {
   const products = store.getProducts();
   const cfg = store.getConfig();
@@ -246,11 +251,11 @@ function renderPerformance(products, yday, cfg) {
     } },
     { key: 'spend', label: 'Spend', align: 'right', sortValue: (r) => r.tm.spend, render: (r) => metrics.fmt(r.tm.spend, 'peso') },
     { key: 'revenue', label: 'Revenue', align: 'right', sortValue: (r) => r.tm.revenue, render: (r) => metrics.fmt(r.tm.revenue, 'peso') },
-    { key: 'roas', label: 'ROAS', align: 'right', sortValue: (r) => r.tm.roas ?? -1, render: (r) => el('span', {}, metrics.fmt(r.tm.roas, 'roas'), delta(r.tm.roas, r.ym.roas)) },
+    { key: 'roas', label: 'ROAS', align: 'right', sortValue: (r) => r.tm.roas ?? -1, cellBg: (r) => roasHeat(r.tm.roas, cfg), render: (r) => el('span', {}, metrics.fmt(r.tm.roas, 'roas'), delta(r.tm.roas, r.ym.roas)) },
     { key: 'cpp', label: 'CPP', align: 'right', sortValue: (r) => r.tm.cpp ?? Infinity, render: (r) => metrics.fmt(r.tm.cpp, 'cpp') },
     { key: 'ctr', label: 'CTR', align: 'right', sortValue: (r) => r.tm.ctr ?? -1, render: (r) => metrics.fmt(r.tm.ctr, 'ctr') },
     { key: 'cpm', label: 'CPM', align: 'right', sortValue: (r) => r.tm.cpm ?? -1, render: (r) => metrics.fmt(r.tm.cpm, 'cpm') },
-    { key: 'profit', label: 'Profit', align: 'right', sortValue: (r) => r.prof, render: (r) => {
+    { key: 'profit', label: 'Profit', align: 'right', sortValue: (r) => r.prof, cellBg: (r) => profitHeat(r.prof, r.tm.spend), render: (r) => {
       const tone = r.prof > 0.0001 ? 'good' : r.prof < -0.0001 ? 'bad' : 'warn';
       const lbl = metrics.profitLabel(r.prof, r.tm.spend);
       return el('div', { style: { textAlign: 'right' } },

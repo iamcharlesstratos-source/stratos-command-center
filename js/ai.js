@@ -10,7 +10,7 @@
 // backend 'auto' uses the proxy if a Proxy URL is set, else direct.
 
 import * as store from './store.js';
-import { openModal, textarea, toast, el, button } from './ui.js';
+import { openModal, textarea, toast, el, button, orbitalMark, skeleton } from './ui.js';
 
 const ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
@@ -170,7 +170,9 @@ export function parseList(text) {
  */
 export function openAiEditor(opts) {
   const ta = textarea({ rows: 12, value: '', placeholder: 'Generating…' });
-  const status = el('div', { class: 'loading' }, el('span', { class: 'spinner' }), el('span', { text: 'Generating with AI…' }));
+  const status = el('div', {},
+    el('div', { class: 'loading', style: { marginBottom: '12px' } }, orbitalMark(22, { spin: true }), el('span', { text: 'Generating with AI…' })),
+    skeleton(4));
   const errBox = el('div', { class: 'field__hint', style: { color: 'var(--bad)' } });
   const body = el('div', { class: 'stack' },
     opts.asList ? el('div', { class: 'field__hint', text: 'Each non-empty line becomes a separate item.' }) : null,

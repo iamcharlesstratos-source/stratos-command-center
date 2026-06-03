@@ -4,7 +4,7 @@
 
 import * as store from '../store.js';
 import * as metrics from '../metrics.js';
-import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, lineChart, barChart } from '../ui.js';
+import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, lineChart, barChart, countUp } from '../ui.js';
 import { todayStr, yesterdayStr } from '../util.js';
 
 const MODULES = [
@@ -24,7 +24,7 @@ export function render(view) {
   const cfg = store.getConfig();
 
   view.appendChild(pageHeader(
-    'Today', `Command center · ${today}`,
+    'Today', `Mga dapat aksyunan ngayon · ${today}`,
     products.length ? [button('+ New product', { variant: 'primary', onClick: () => { location.hash = '#/products'; } })] : [],
   ));
 
@@ -59,12 +59,20 @@ export function render(view) {
   const dayProfit = dayRows.reduce((sum, r) => sum + metrics.profit(r, store.getProduct(r.productCode)), 0);
   const margin = metrics.profitLabel(dayProfit, agg.spend);
   const roasTone = (() => { const l = metrics.labelForRoas(agg.roas, cfg.thresholds); return l === 'Scale' ? 'good' : l === 'Observe' ? 'warn' : l === 'Kill' ? 'bad' : undefined; })();
-  view.appendChild(el('div', { class: 'grid grid-4', style: { marginTop: 'var(--gap)' } },
+  const heroGrid = el('div', { class: 'grid grid-4', style: { marginTop: 'var(--gap)' } },
     statTile('Ad spend today', metrics.fmt(agg.spend, 'peso'), { sub: `${dayRows.length} product(s) logged` }),
     statTile('Revenue today', metrics.fmt(agg.revenue, 'peso'), { tone: agg.revenue >= agg.spend ? 'good' : 'bad' }),
     statTile('Blended ROAS', metrics.fmt(agg.roas, 'roas'), { tone: roasTone }),
     statTile('Est. profit', metrics.fmt(dayProfit, 'peso'), { tone: dayProfit > 0 ? 'good' : dayProfit < 0 ? 'bad' : 'warn', sub: margin || '—' }),
-  ));
+  );
+  view.appendChild(heroGrid);
+  // count-up animation on the hero numbers (reduced-motion aware inside countUp)
+  const hv = heroGrid.querySelectorAll('.stat-tile__value');
+  const peso = (v) => Math.round(v).toLocaleString('en-PH');
+  countUp(hv[0], agg.spend, { prefix: '₱', fmt: peso });
+  countUp(hv[1], agg.revenue, { prefix: '₱', fmt: peso });
+  if (Number.isFinite(agg.roas)) countUp(hv[2], agg.roas, { fmt: (v) => v.toFixed(2), suffix: '×' });
+  countUp(hv[3], dayProfit, { prefix: '₱', fmt: peso });
   if (!dayRows.length) {
     view.appendChild(el('p', { class: 'muted', style: { marginTop: '-6px' } },
       'No metrics logged for today yet — ', el('a', { href: '#/daily', style: { color: 'var(--accent)' }, text: 'log them in the Daily Dashboard →' })));

@@ -211,6 +211,7 @@ export function sortableTable(columns, rows, opts = {}) {
         const content = col.render ? col.render(row) : row[col.key];
         if (content instanceof Node) td.appendChild(content);
         else td.textContent = content ?? '—';
+        if (col.cellBg) { const bg = col.cellBg(row); if (bg) td.style.background = bg; }
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
@@ -334,9 +335,53 @@ export function card(title, ...children) {
 }
 
 export function emptyState(message, actionNode) {
-  const e = el('div', { class: 'empty-state' }, el('p', { text: message }));
+  const e = el('div', { class: 'empty-state' });
+  e.appendChild(orbitalMark(40, { opacity: 0.85 }));
+  e.appendChild(el('p', { text: message, style: { marginTop: '12px' } }));
   if (actionNode) e.appendChild(actionNode);
   return e;
+}
+
+/** The STRATOS orbital-S brand mark as an inline SVG element (the identity motif). */
+export function orbitalMark(size = 48, { opacity = 1, spin = false } = {}) {
+  const span = el('span', { class: 'orbital-mark' + (spin ? ' orbital-mark--spin' : ''), style: { display: 'inline-flex', width: size + 'px', height: size + 'px', opacity } });
+  span.innerHTML = `<svg viewBox="0 0 48 48" width="${size}" height="${size}" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs><linearGradient id="om-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#4F7BFF"/><stop offset="0.5" stop-color="#8B5CF6"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
+    <g class="orbital-mark__rings">
+      <ellipse cx="24" cy="24" rx="21" ry="9" stroke="url(#om-grad)" stroke-width="1.5" opacity="0.55" transform="rotate(-28 24 24)"/>
+      <ellipse cx="24" cy="24" rx="21" ry="9" stroke="url(#om-grad)" stroke-width="1.5" opacity="0.35" transform="rotate(38 24 24)"/>
+    </g>
+    <path d="M31 16.5c-1.8-1.7-4.4-2.7-7-2.7-3.9 0-6.8 2.1-6.8 5.2 0 3 2.4 4.3 6.6 5.1 4.4.8 7.4 2.2 7.4 5.6 0 3.4-3.2 5.7-7.6 5.7-3 0-5.8-1.1-7.6-3" stroke="url(#om-grad)" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+    <circle cx="24" cy="24" r="2.4" fill="#EC4899"/>
+  </svg>`;
+  return span;
+}
+
+/** Shimmer skeleton placeholder (reduced-motion handled in CSS). */
+export function skeleton(lines = 3) {
+  const w = el('div', { class: 'stack', style: { gap: '10px' } });
+  for (let i = 0; i < lines; i++) w.appendChild(el('div', { class: 'skeleton', style: { height: '14px', width: (95 - i * 12) + '%' } }));
+  return w;
+}
+
+/** Animate a number from 0 → `to` into a node. Respects reduced-motion. */
+export function countUp(node, to, { duration = 650, fmt = (v) => Math.round(v).toLocaleString('en-PH'), prefix = '', suffix = '' } = {}) {
+  if (!node) return;
+  const finalText = prefix + fmt(to) + suffix;
+  // Skip the animation (just show the value) when reduced-motion, the value isn't
+  // finite, or the tab is hidden (rAF is paused for background tabs).
+  if (!Number.isFinite(to) || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) { node.textContent = finalText; return; }
+  let done = false;
+  const finish = () => { if (done) return; done = true; node.textContent = finalText; };
+  const start = performance.now();
+  (function tick(now) {
+    if (done) return;
+    const t = Math.min(1, (now - start) / duration);
+    node.textContent = prefix + fmt(to * (1 - Math.pow(1 - t, 3))) + suffix;
+    if (t < 1) requestAnimationFrame(tick); else finish();
+  })(start);
+  // Safety: even if rAF stalls (background tab), guarantee the final value.
+  setTimeout(finish, duration + 120);
 }
 
 /** Small stat tile (label + big value + optional sub). */
@@ -438,7 +483,7 @@ export function lineChart(datasets, { width = 560, height = 170, labels = [], fm
     const lbl = (i, anchor, x) => { const t = svgEl('text', { x, y: height - 6, fill: 'var(--text-dim)', 'font-size': 9, 'text-anchor': anchor }); t.textContent = labels[i]; svg.appendChild(t); };
     lbl(0, 'start', pad); lbl(labels.length - 1, 'end', width - pad);
   }
-  const wrap = el('div', {});
+  const wrap = el('div', { class: 'chart-rise' });
   if (datasets.some((d) => d.name)) {
     const legend = el('div', { class: 'row', style: { gap: '14px', marginBottom: '6px', flexWrap: 'wrap' } });
     datasets.forEach((d) => legend.appendChild(el('span', { class: 'muted', style: { fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' } },

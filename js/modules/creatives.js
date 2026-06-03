@@ -103,7 +103,7 @@ function renderLeaderboard(view, creatives) {
     { key: 'rank', label: '#', align: 'center', sortValue: (r) => r._rank, render: (r) => medal(r._rank) },
     { key: 'title', label: 'Creative', render: (r) => el('div', {}, el('strong', { text: r.title || '(untitled)' }), el('div', { class: 'muted', style: { fontSize: '11px' } }, el('span', { class: 'code-badge', text: r.productCode }), ' · ' + r.type)) },
     { key: 'score', label: 'Score', align: 'right', sortValue: (r) => r._score, render: (r) => el('strong', { text: r._score.toFixed(0) }) },
-    { key: 'roas', label: 'ROAS', align: 'right', sortValue: (r) => r._metrics.roas ?? -1, render: (r) => metrics.fmt(r._metrics.roas, 'roas') },
+    { key: 'roas', label: 'ROAS', align: 'right', sortValue: (r) => r._metrics.roas ?? -1, cellBg: (r) => { const l = metrics.labelForRoas(r._metrics.roas, store.getConfig().thresholds); return l === 'Scale' ? 'rgba(45,212,167,0.18)' : l === 'Observe' ? 'rgba(245,185,69,0.16)' : l === 'Kill' ? 'rgba(244,80,107,0.16)' : null; }, render: (r) => metrics.fmt(r._metrics.roas, 'roas') },
     { key: 'cpp', label: 'CPP', align: 'right', sortValue: (r) => r._metrics.cpp ?? Infinity, render: (r) => metrics.fmt(r._metrics.cpp, 'cpp') },
     { key: 'ctr', label: 'CTR', align: 'right', sortValue: (r) => r._metrics.ctr ?? -1, render: (r) => metrics.fmt(r._metrics.ctr, 'ctr') },
     { key: 'cpm', label: 'CPM', align: 'right', sortValue: (r) => r._metrics.cpm ?? -1, render: (r) => metrics.fmt(r._metrics.cpm, 'cpm') },
