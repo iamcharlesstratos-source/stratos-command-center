@@ -527,6 +527,52 @@ function openChangePassword() {
   setTimeout(() => pw1.focus(), 30);
 }
 
+// One-time Supabase setup for the team profiles table (roles + name + avatar).
+const PROFILES_SETUP_SQL = `-- STRATOS — team profiles (roles + display name + avatar)
+create table if not exists public.stratos_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  name text,
+  role text not null default 'Graphic Artist',
+  avatar text,
+  updated_at timestamptz default now()
+);
+alter table public.stratos_profiles enable row level security;
+
+create or replace function public.stratos_is_admin()
+returns boolean language sql security definer stable as
+$$ select exists(select 1 from public.stratos_profiles where id = auth.uid() and role = 'Advertiser') $$;
+
+drop policy if exists "profiles read" on public.stratos_profiles;
+create policy "profiles read" on public.stratos_profiles for select to authenticated using (true);
+drop policy if exists "profiles insert self" on public.stratos_profiles;
+create policy "profiles insert self" on public.stratos_profiles for insert to authenticated with check (id = auth.uid());
+drop policy if exists "profiles update self" on public.stratos_profiles;
+create policy "profiles update self" on public.stratos_profiles for update to authenticated using (id = auth.uid());
+drop policy if exists "profiles update admin" on public.stratos_profiles;
+create policy "profiles update admin" on public.stratos_profiles for update to authenticated using (public.stratos_is_admin());`;
+
+function renderProfilesSetup() {
+  const wrap = el('div', { class: 'stack', style: { gap: '8px' } });
+  wrap.appendChild(el('p', { class: 'field__hint', text: 'I-set up ang User Management — isang beses lang: kopyahin ang SQL → Supabase → SQL Editor → paste → Run, tapos mag-log out / log in ulit.' }));
+  const ta = el('textarea', { class: 'input', style: { fontFamily: 'var(--mono)', fontSize: '11px', height: '170px', whiteSpace: 'pre', width: '100%' } });
+  ta.readOnly = true;
+  ta.value = PROFILES_SETUP_SQL;
+  ta.addEventListener('focus', () => ta.select());
+  const copyBtn = button('📋 Copy SQL', { variant: 'primary', onClick: () => {
+    const done = () => toast('Na-copy ang SQL — i-paste sa Supabase SQL Editor.', 'success');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(PROFILES_SETUP_SQL).then(done).catch(() => { ta.select(); done(); });
+    else { ta.select(); try { document.execCommand('copy'); } catch (e) { /* ignore */ } done(); }
+  } });
+  const sync = store.getConfig().sync || {};
+  const m = (sync.url || '').match(/https?:\/\/([a-z0-9]+)\.supabase\.co/i);
+  const dashUrl = m ? `https://supabase.com/dashboard/project/${m[1]}/sql/new` : 'https://supabase.com/dashboard';
+  const openLink = el('a', { class: 'btn btn--ghost', href: dashUrl, target: '_blank', rel: 'noopener', text: 'Open SQL Editor ↗' });
+  wrap.appendChild(ta);
+  wrap.appendChild(el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, copyBtn, openLink));
+  return wrap;
+}
+
 // Admin-only: view the team & change roles (writes to the stratos_profiles table).
 function openUserManagement() {
   const host = el('div', { class: 'stack' });
@@ -543,7 +589,7 @@ function openUserManagement() {
     catch (e) {
       loading.remove();
       host.appendChild(el('p', { class: 'field__hint', style: { color: 'var(--bad)' }, text: e.message }));
-      host.appendChild(el('p', { class: 'field__hint', text: 'I-set up muna ang stratos_profiles table sa Supabase (tingnan ang setup SQL na binigay).' }));
+      host.appendChild(renderProfilesSetup());
       return;
     }
     loading.remove();
