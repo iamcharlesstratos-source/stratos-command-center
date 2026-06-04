@@ -272,6 +272,14 @@ export function computeAlerts() {
   const overdue = store.getCreatives().filter((c) => c.deadline && c.deadline < today && !['Approved', 'Launched', 'Winner'].includes(c.status));
   if (overdue.length) out.push({ level: 'bad', icon: '⏰', text: `${overdue.length} creative${overdue.length > 1 ? 's' : ''} overdue`, route: '#/creatives' });
 
+  // creatives the Graphic Artist submitted, waiting for review
+  const forReview = store.getCreatives().filter((c) => c.status === 'For Review');
+  if (forReview.length) out.push({ level: 'warn', icon: '🎨', text: `${forReview.length} creative${forReview.length > 1 ? 's' : ''} for review`, route: '#/creatives' });
+
+  // scheduled launches due today or overdue (not yet launched)
+  const dueLaunch = store.getCreatives().filter((c) => c.launchDate && c.launchDate <= today && !['Launched', 'Winner'].includes(c.status));
+  if (dueLaunch.length) out.push({ level: 'warn', icon: '🚀', text: `${dueLaunch.length} creative${dueLaunch.length > 1 ? 's' : ''} due to launch`, route: '#/creatives' });
+
   // per-product: bleeding (latest day) + fatigue
   for (const p of store.getProducts()) {
     const m = latestMetric(p.code);

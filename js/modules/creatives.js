@@ -278,6 +278,7 @@ function openCreativeModal(view, existing) {
   const scriptTa = textarea({ value: e.script || '', rows: 4, placeholder: 'Script (video) or image concept/prompt' });
   const assigneeSel = select(cfg.team.length ? cfg.team : ['Unassigned'], { value: e.assignee || cfg.team[0] || 'Unassigned' });
   const deadlineInput = input({ type: 'date', value: e.deadline || '' });
+  const launchInput = input({ type: 'date', value: e.launchDate || '' });
   const statusSel = select(STATUSES, { value: e.status || 'To Do' });
 
   const metricInputs = {};
@@ -319,7 +320,8 @@ function openCreativeModal(view, existing) {
     field('Script / concept', scriptTa, { full: true }),
     aiRow,
     el('div', { class: 'form-grid' },
-      field('Assignee', assigneeSel), field('Deadline', deadlineInput), field('Status', statusSel),
+      field('Assignee', assigneeSel), field('Deadline', deadlineInput),
+      field('Launch date', launchInput, { hint: '🚀 kailan ilulunsad' }), field('Status', statusSel),
     ),
     e.sourceCompetitorId ? el('div', { class: 'field__hint' }, '↻ Duplicated from competitor ', el('a', { href: '#/competitors', text: 'ad' }), ' #' + e.sourceCompetitorId) : null,
     e.sourceCreativeId ? el('div', { class: 'field__hint' }, '↳ Variant of ', el('a', { href: '#/creatives', text: (store.getCreative(e.sourceCreativeId)?.title) || ('#' + e.sourceCreativeId) })) : null,
@@ -340,7 +342,7 @@ function openCreativeModal(view, existing) {
           ...(existing || {}),
           type: typeSel.value, productCode: productSel.value, title: titleInput.value.trim(),
           hook: hookInput.value.trim(), script: scriptTa.value, assignee: assigneeSel.value,
-          deadline: deadlineInput.value, status: statusSel.value,
+          deadline: deadlineInput.value, launchDate: launchInput.value, status: statusSel.value,
           metrics: Object.fromEntries(Object.entries(metricInputs).map(([k, v]) => [k, toNum(v.value)])),
         });
         metrics.recomputeStatus(saved.productCode);

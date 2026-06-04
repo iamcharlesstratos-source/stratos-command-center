@@ -268,6 +268,7 @@ export function upsertCreative(creative) {
   const c = { ...creative };
   if (!c.id) c.id = uid('cr');
   if (!c.createdAt) c.createdAt = nowISO();
+  c.updatedAt = nowISO(); // stamp every write — powers "new since last seen" review alerts
   if (!c.metrics) c.metrics = { spend: 0, revenue: 0, impressions: 0, clicks: 0, purchases: 0 };
   return upsertInto(KEYS.creatives, c, 'id', 'creatives');
 }

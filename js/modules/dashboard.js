@@ -58,6 +58,13 @@ export function render(view) {
     view.appendChild(c);
   }
 
+  // ---- 1b) CREATIVES FOR REVIEW (Advertiser only) — submitted by the Graphic Artist ----
+  if (isAdmin()) {
+    notifyNewReviews(cfg);
+    const queue = renderReviewQueue(view);
+    if (queue) view.appendChild(queue);
+  }
+
   // ---- 2) TODAY hero KPIs ----
   const dayRows = store.getDailyMetricsByDate(today);
   const agg = metrics.aggregate(dayRows);
@@ -147,6 +154,61 @@ export function render(view) {
   }
   view.appendChild(el('h3', { class: 'card__title', style: { marginTop: 'var(--gap-lg)' }, text: 'Modules' }));
   view.appendChild(links);
+}
+
+// ---------------------------------------------------------------------------
+// Creative review queue + launch scheduler (Advertiser-facing)
+// ---------------------------------------------------------------------------
+function rerenderDash() { if (window.STRATOS) window.STRATOS.renderRoute(); }
+
+function renderReviewQueue() {
+  const forReview = store.getCreatives()
+    .filter((c) => c.status === 'For Review')
+    .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+  if (!forReview.length) return null;
+
+  const c = el('section', { class: 'card', style: { borderLeft: '3px solid var(--accent)' } });
+  c.appendChild(el('h3', { class: 'card__title', text: `🎨 Creatives for review (${forReview.length})` }));
+  c.appendChild(el('p', { class: 'muted', style: { margin: '0 0 8px', fontSize: '12px' }, text: 'Mga bagong creative mula sa Graphic Artist. I-review, mag-set ng launch date, tapos Approve.' }));
+  const list = el('div', { class: 'stack', style: { gap: '8px' } });
+  forReview.forEach((cr) => {
+    const dateInput = el('input', { class: 'input', type: 'date', value: cr.launchDate || '', style: { width: 'auto' }, title: 'Launch date' });
+    const schedule = button('🗓️ Schedule', { variant: 'ghost', title: 'I-save ang launch date (mananatiling For Review)', onClick: () => {
+      if (!dateInput.value) { toast('Pumili muna ng petsa.', 'warn'); return; }
+      store.upsertCreative({ ...cr, launchDate: dateInput.value });
+      toast(`Naka-schedule: ${cr.title || 'creative'} → ${dateInput.value}`, 'success'); rerenderDash();
+    } });
+    const approve = button('✓ Approve', { variant: 'primary', onClick: () => {
+      store.upsertCreative({ ...cr, status: 'Approved', launchDate: dateInput.value || cr.launchDate || '' });
+      if (cr.productCode) metrics.recomputeStatus(cr.productCode);
+      toast(`Approved: ${cr.title || 'creative'}${dateInput.value ? ' · launch ' + dateInput.value : ''}`, 'success'); rerenderDash();
+    } });
+    const open = el('a', { href: '#/creatives', class: 'btn btn--ghost btn--sm', text: 'Open' });
+    list.appendChild(el('div', { class: 'spread', style: { padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', gap: '10px', flexWrap: 'wrap', alignItems: 'center' } },
+      el('div', { style: { minWidth: '0' } },
+        el('div', { style: { fontWeight: '600' }, text: cr.title || '(untitled)' }),
+        el('div', { class: 'muted', style: { fontSize: '11px', marginTop: '2px' } }, el('span', { class: 'code-badge', text: cr.productCode || '—' }), document.createTextNode(`  ·  ${cr.type || 'image'}${cr.assignee ? '  ·  ' + cr.assignee : ''}`))),
+      el('div', { class: 'row', style: { gap: '6px', alignItems: 'center', flexWrap: 'wrap' } },
+        el('span', { class: 'field__label', text: 'Launch' }), dateInput, schedule, approve, open)));
+  });
+  c.appendChild(list);
+  return c;
+}
+
+// One-time toast (+ browser notification) when the GA submits new creatives.
+function notifyNewReviews(cfg) {
+  const seenAt = (cfg.ui && cfg.ui.reviewSeenAt) || '';
+  const fresh = store.getCreatives().filter((c) => c.status === 'For Review' && (c.updatedAt || c.createdAt || '') > seenAt);
+  if (!fresh.length) return;
+  toast(`🎨 ${fresh.length} bagong creative for review!`, 'info');
+  try {
+    if ('Notification' in window) {
+      const body = fresh.map((c) => c.title).filter(Boolean).slice(0, 3).join(', ') || 'Buksan ang dashboard para i-review.';
+      if (Notification.permission === 'granted') new Notification('Bagong creative for review', { body });
+      else if (Notification.permission !== 'denied') Notification.requestPermission().then((p) => { if (p === 'granted') new Notification('Bagong creative for review', { body }); });
+    }
+  } catch (e) { /* ignore */ }
+  store.updateConfig({ ui: { reviewSeenAt: new Date().toISOString() } });
 }
 
 // ---------------------------------------------------------------------------
