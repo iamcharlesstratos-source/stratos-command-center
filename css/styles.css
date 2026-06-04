@@ -451,15 +451,6 @@ a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-ra
   }
 }
 
-/* compact density (header toggle adds body.density-compact) */
-body.density-compact .data-table thead th { padding: 7px 12px; }
-body.density-compact .data-table tbody td { padding: 6px 12px; font-size: 12.5px; }
-body.density-compact .card { padding: 14px; }
-body.density-compact .card + .card { margin-top: 12px; }
-body.density-compact .stat-tile { padding: 12px; }
-body.density-compact .stat-tile__value { font-size: 22px; }
-body.density-compact .btn { padding: 6px 11px; }
-
 /* authoritative figures */
 .stat-tile__value, .page-title { font-feature-settings: "tnum" 1; letter-spacing: -0.02em; }
 
@@ -560,3 +551,18 @@ body.density-compact .btn { padding: 6px 11px; }
 .banner { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); font-size: 13px; }
 .banner--info { border-color: rgba(59, 130, 246, 0.45); background: rgba(59, 130, 246, 0.12); color: var(--text); }
 .banner--warn { border-color: rgba(245, 185, 69, 0.4); background: var(--warn-bg); color: var(--text); }
+
+/* sidebar team roster — Advertisers & Graphic Artists */
+.nav__team { padding: 10px 6px 2px; margin-top: 6px; border-top: 1px solid var(--border); }
+.nav__team:empty { display: none; }
+.nav-team__title { font-size: 10px; text-transform: uppercase; letter-spacing: .16em; color: var(--text-dim); padding: 0 8px 2px; }
+.nav-team__group { margin-bottom: 2px; }
+.nav-team__label { font-size: 10px; font-weight: 700; color: var(--text-dim); padding: 5px 8px 2px; text-transform: uppercase; letter-spacing: .05em; }
+.nav-team__member { display: flex; align-items: center; gap: 8px; padding: 3px 8px; font-size: 12px; color: var(--text); border-radius: 6px; }
+.nav-team__member.is-me { background: var(--surface-2); }
+.nav-team__member.is-me .nav-team__name { font-weight: 700; }
+.nav-team__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+.nav-team__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-team__manage { display: block; font-size: 11px; color: var(--accent); padding: 6px 8px 0; text-decoration: none; }
+.nav-team__manage:hover { text-decoration: underline; }
+@media (max-width: 720px) { .nav__team { display: none; } }
