@@ -12,7 +12,7 @@ const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
 const MODULES = [
   { route: 'products', title: 'Product Testing', desc: 'R&D, scoring, offers, pricing & launch readiness — the hub.' },
   { route: 'creatives', title: 'Creative Testing', desc: 'Brief, assign & rank image/video creatives.' },
-  { route: 'daily', title: 'Daily Dashboard', desc: 'Daily spend/revenue → ROAS, CPP, CPM, CTR & scale calls.' },
+  { route: 'daily', title: 'Daily Metrics', desc: 'Daily spend/revenue → ROAS, CPP, CPM, CTR & scale calls.' },
   { route: 'pages', title: 'Page Status', desc: 'Per-Facebook-Page performance & product mapping.' },
   { route: 'content', title: 'AI Content', desc: 'Captions, hooks, headlines & scripts in Taglish.' },
   { route: 'competitors', title: 'Competitor Ads', desc: 'Track competitor ads & recreate / improve them.' },
@@ -79,7 +79,7 @@ export function render(view) {
   countUp(hv[3], dayProfit, { prefix: '₱', fmt: peso });
   if (!dayRows.length) {
     view.appendChild(el('p', { class: 'muted', style: { marginTop: '-6px' } },
-      'No metrics logged for today yet — ', el('a', { href: '#/daily', style: { color: 'var(--accent)' }, text: 'log them in the Daily Dashboard →' })));
+      'No metrics logged for today yet — ', el('a', { href: '#/daily', style: { color: 'var(--accent)' }, text: 'log them in Daily Metrics →' })));
   }
 
   // ---- 3) TODAY'S CALLS (scale / observe / kill) + movers ----

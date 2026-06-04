@@ -33,7 +33,7 @@ export function render(view) {
   const dateInput = el('input', { class: 'input', type: 'date', value: selectedDate, style: { width: 'auto' } });
   dateInput.addEventListener('change', () => { selectedDate = dateInput.value || todayStr(); rerender(view); });
   view.appendChild(pageHeader(
-    'Daily Marketing Dashboard',
+    'Daily Metrics',
     'Which product is winning, losing, or ready to scale — for the selected day.',
     [
       isAdmin() ? button('⇪ Paste import', { variant: 'ghost', onClick: () => openImportModal(view) }) : null,
