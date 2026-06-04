@@ -15,6 +15,12 @@
   src: url('../fonts/space-grotesk-700.woff2') format('woff2');
 }
 
+/* Self-hosted Poppins (OFL) — primary UI font (latin subset, /fonts) */
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 400; font-display: swap; src: url('../fonts/poppins-400.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 500; font-display: swap; src: url('../fonts/poppins-500.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 600; font-display: swap; src: url('../fonts/poppins-600.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 700; font-display: swap; src: url('../fonts/poppins-700.woff2') format('woff2'); }
+
 :root {
   color-scheme: dark;     /* native selects/date-pickers/scrollbars render dark */
   /* ---- palette: graphite (premium dark — Linear/Raycast direction) ---- */
@@ -58,8 +64,8 @@
   --topbar-bg: rgba(11, 16, 32, 0.72);
   --zebra: rgba(255, 255, 255, 0.022);
 
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, system-ui, sans-serif;
-  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
 
