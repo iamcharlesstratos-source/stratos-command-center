@@ -346,13 +346,13 @@ export function emptyState(message, actionNode) {
 export function orbitalMark(size = 48, { opacity = 1, spin = false } = {}) {
   const span = el('span', { class: 'orbital-mark' + (spin ? ' orbital-mark--spin' : ''), style: { display: 'inline-flex', width: size + 'px', height: size + 'px', opacity } });
   span.innerHTML = `<svg viewBox="0 0 48 48" width="${size}" height="${size}" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <defs><linearGradient id="om-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#4F7BFF"/><stop offset="0.5" stop-color="#8B5CF6"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
+    <defs><linearGradient id="om-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#60A5FA"/><stop offset="0.5" stop-color="#3B82F6"/><stop offset="1" stop-color="#2563EB"/></linearGradient></defs>
     <g class="orbital-mark__rings">
       <ellipse cx="24" cy="24" rx="21" ry="9" stroke="url(#om-grad)" stroke-width="1.5" opacity="0.55" transform="rotate(-28 24 24)"/>
       <ellipse cx="24" cy="24" rx="21" ry="9" stroke="url(#om-grad)" stroke-width="1.5" opacity="0.35" transform="rotate(38 24 24)"/>
     </g>
     <path d="M31 16.5c-1.8-1.7-4.4-2.7-7-2.7-3.9 0-6.8 2.1-6.8 5.2 0 3 2.4 4.3 6.6 5.1 4.4.8 7.4 2.2 7.4 5.6 0 3.4-3.2 5.7-7.6 5.7-3 0-5.8-1.1-7.6-3" stroke="url(#om-grad)" stroke-width="3.2" stroke-linecap="round" fill="none"/>
-    <circle cx="24" cy="24" r="2.4" fill="#EC4899"/>
+    <circle cx="24" cy="24" r="2.4" fill="#2563EB"/>
   </svg>`;
   return span;
 }
@@ -412,7 +412,7 @@ export function statTile(label, value, { sub, tone } = {}) {
  * Tiny inline SVG sparkline from a list of numbers (nulls are skipped/ignored).
  * opts: { width, height, color, fill }. Returns an <svg> element.
  */
-export function sparkline(values, { width = 84, height = 24, color = '#8B5CF6', fill = true } = {}) {
+export function sparkline(values, { width = 84, height = 24, color = '#3B82F6', fill = true } = {}) {
   const nums = values.map((v) => (Number.isFinite(v) ? v : null));
   const present = nums.filter((v) => v !== null);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

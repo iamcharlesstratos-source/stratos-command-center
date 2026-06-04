@@ -122,7 +122,7 @@ export function render(view) {
   if (anyTrend || profitItems.length) {
     const grid = el('div', { class: 'grid grid-2', style: { marginTop: 'var(--gap)' } });
     if (anyTrend) grid.appendChild(card('Spend vs Revenue · 7 days',
-      lineChart([{ name: 'Spend', color: '#4F7BFF', values: spendSeries }, { name: 'Revenue', color: '#2DD4A7', values: revSeries }],
+      lineChart([{ name: 'Spend', color: '#3B82F6', values: spendSeries }, { name: 'Revenue', color: '#2DD4A7', values: revSeries }],
         { labels: dates.map((d) => d.slice(5)), fmt: (v) => '₱' + Math.round(v / 1000) + 'k' })));
     if (profitItems.length) grid.appendChild(card('Profit by product · today',
       barChart(profitItems, { fmt: (v) => metrics.fmt(v, 'peso') })));
