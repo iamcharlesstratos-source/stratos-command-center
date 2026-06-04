@@ -14,7 +14,10 @@ const listeners = new Set();
 function creds() { const s = store.getConfig().sync || {}; return { url: (s.url || '').replace(/\/+$/, ''), anonKey: s.anonKey || '' }; }
 export function isConfigured() { const c = creds(); return !!(c.url && c.anonKey); }
 function base() { return creds().url + '/auth/v1'; }
+function rest() { return creds().url + '/rest/v1'; }
 function headers(extra) { return { apikey: creds().anonKey, 'Content-Type': 'application/json', ...extra }; }
+// PostgREST calls authenticated as the logged-in user (JWT), falling back to anon.
+function authedHeaders(extra) { return { apikey: creds().anonKey, Authorization: 'Bearer ' + (token() || creds().anonKey), 'Content-Type': 'application/json', ...extra }; }
 
 export function onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 function emit() { for (const fn of listeners) { try { fn(session); } catch (e) { console.error(e); } } }
@@ -51,13 +54,14 @@ async function call(path, body, extraHeaders) {
 /** Create an account. Returns user, or throws 'CONFIRM_EMAIL' if email confirmation is on. */
 export async function signUp(email, password, { role: r = 'Advertiser', name = '' } = {}) {
   const data = await call('/signup', { email, password, data: { role: r, name } });
-  if (data.access_token) { save(shape(data)); return current(); }
+  if (data.access_token) { save(shape(data)); await syncProfile(); return current(); }
   throw new Error('CONFIRM_EMAIL');
 }
 
 export async function signIn(email, password) {
   const data = await call('/token?grant_type=password', { email, password });
   save(shape(data));
+  await syncProfile();
   return current();
 }
 
@@ -83,5 +87,78 @@ export async function init() {
     const ok = await refresh();
     if (!ok) return null;
   }
+  await syncProfile();
   return current();
+}
+
+// ---------------------------------------------------------------------------
+// Team profiles — role lives in a `stratos_profiles` table so Advertisers can
+// manage it (JWT user_metadata can only be changed by the user or a service
+// key). All calls are best-effort: if the table/policies aren't set up yet we
+// silently fall back to the signup role, so login never breaks.
+// ---------------------------------------------------------------------------
+async function fetchProfile(id) {
+  try {
+    const res = await fetch(rest() + '/stratos_profiles?select=*&id=eq.' + encodeURIComponent(id), { headers: authedHeaders() });
+    if (!res.ok) return null;
+    const rows = await res.json().catch(() => []);
+    return rows[0] || null;
+  } catch { return null; }
+}
+async function putProfile(row) {
+  try {
+    await fetch(rest() + '/stratos_profiles', {
+      method: 'POST',
+      headers: authedHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([row]),
+    });
+  } catch { /* ignore */ }
+}
+
+/** Reconcile the logged-in user with the profiles table (table role wins). */
+async function syncProfile() {
+  if (!session || !session.user || !session.user.id) return;
+  const u = session.user;
+  const prof = await fetchProfile(u.id);
+  if (!prof) {
+    // First time we see this user → seed the row from their signup metadata.
+    await putProfile({ id: u.id, email: u.email, name: u.name, role: u.role });
+    return;
+  }
+  const role = prof.role === 'Advertiser' ? 'Advertiser' : 'Graphic Artist';
+  session.user.role = role;
+  if (prof.name) session.user.name = prof.name;
+  save(session);
+  if (prof.email !== u.email) await putProfile({ id: u.id, email: u.email, name: prof.name || u.name, role: prof.role });
+}
+
+/** Admin: list every team member. Throws if the profiles table isn't set up. */
+export async function listUsers() {
+  const res = await fetch(rest() + '/stratos_profiles?select=id,email,name,role,updated_at&order=role.asc,email.asc', { headers: authedHeaders() });
+  if (!res.ok) throw new Error('Cannot load users (' + res.status + '). Make sure the stratos_profiles table + policies exist in Supabase.');
+  return res.json();
+}
+
+/** Admin: change a member's role (takes effect on their next login/refresh). */
+export async function setUserRole(id, role) {
+  const r = role === 'Advertiser' ? 'Advertiser' : 'Graphic Artist';
+  const res = await fetch(rest() + '/stratos_profiles?id=eq.' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: authedHeaders({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ role: r, updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) throw new Error('Update failed (' + res.status + '): ' + (await res.text().catch(() => '')).slice(0, 140));
+  return true;
+}
+
+/** Change the current user's password (GoTrue). */
+export async function updatePassword(newPassword) {
+  if (!isAuthed()) throw new Error('Not logged in.');
+  let res;
+  try {
+    res = await fetch(base() + '/user', { method: 'PUT', headers: headers({ Authorization: 'Bearer ' + token() }), body: JSON.stringify({ password: newPassword }) });
+  } catch (e) { throw new Error('Cannot reach the server. (' + e.message + ')'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.msg || data.error_description || data.error || ('Failed (' + res.status + ')'));
+  return true;
 }

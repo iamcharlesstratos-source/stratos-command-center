@@ -7,7 +7,7 @@ import * as metrics from './metrics.js';
 import * as ai from './ai.js';
 import * as sync from './sync.js';
 import * as auth from './auth.js';
-import { el, clear, button, openModal, confirmDialog, toast, field, input, pageHeader, popoverMenu, orbitalMark } from './ui.js';
+import { el, clear, button, openModal, confirmDialog, toast, field, input, select, pageHeader, popoverMenu, orbitalMark } from './ui.js';
 import { todayStr } from './util.js';
 
 // Module views (each exports `render(view, params)`).
@@ -413,6 +413,10 @@ function openIdentityModal() {
       ),
       u && u.email ? el('p', { class: 'field__hint', style: { margin: '0' }, text: u.email }) : null,
       el('p', { class: 'field__hint', text: roleLine }),
+      el('div', { class: 'row', style: { gap: '8px', marginTop: '4px', flexWrap: 'wrap' } },
+        button('Change password', { variant: 'ghost', onClick: openChangePassword }),
+        admin ? button('Manage users', { variant: 'primary', onClick: openUserManagement }) : null,
+      ),
     ),
     actions: [
       { label: 'Close', variant: 'ghost', onClick: (close) => close() },
@@ -423,6 +427,82 @@ function openIdentityModal() {
       } },
     ],
   });
+}
+
+// Change the logged-in user's own password.
+function openChangePassword() {
+  const pw1 = input({ type: 'password', placeholder: 'New password', autocomplete: 'new-password' });
+  const pw2 = input({ type: 'password', placeholder: 'Confirm new password', autocomplete: 'new-password' });
+  const msg = el('div', { class: 'field__hint', style: { color: 'var(--bad)' } });
+  openModal({
+    title: 'Change password', width: 420,
+    body: el('div', { class: 'stack' },
+      field('New password', pw1, { hint: 'At least 6 characters.' }),
+      field('Confirm new password', pw2),
+      msg,
+    ),
+    actions: [
+      { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
+      { label: 'Update password', variant: 'primary', onClick: async (close) => {
+        msg.textContent = '';
+        const a = pw1.value, b = pw2.value;
+        if (a.length < 6) { msg.textContent = 'Password must be at least 6 characters.'; return; }
+        if (a !== b) { msg.textContent = 'Passwords do not match.'; return; }
+        try { await auth.updatePassword(a); toast('Password updated.', 'success'); close(); }
+        catch (e) { msg.textContent = e.message; }
+      } },
+    ],
+  });
+  setTimeout(() => pw1.focus(), 30);
+}
+
+// Admin-only: view the team & change roles (writes to the stratos_profiles table).
+function openUserManagement() {
+  const host = el('div', { class: 'stack' });
+  openModal({ title: 'User management', width: 620, body: host, actions: [{ label: 'Close', variant: 'ghost', onClick: (close) => close() }] });
+  renderUsers();
+
+  async function renderUsers() {
+    clear(host);
+    host.appendChild(el('p', { class: 'field__hint', text: 'Lahat ng naka-sign up sa workspace. Baguhin ang role kung kailangan — mag-aapply sa susunod nilang pag-login.' }));
+    const loading = el('div', { class: 'loading', style: { padding: '8px 0' } }, orbitalMark(20, { spin: true }), el('span', { text: 'Loading team…' }));
+    host.appendChild(loading);
+    let users;
+    try { users = await auth.listUsers(); }
+    catch (e) {
+      loading.remove();
+      host.appendChild(el('p', { class: 'field__hint', style: { color: 'var(--bad)' }, text: e.message }));
+      host.appendChild(el('p', { class: 'field__hint', text: 'I-set up muna ang stratos_profiles table sa Supabase (tingnan ang setup SQL na binigay).' }));
+      return;
+    }
+    loading.remove();
+    const me = auth.current();
+    const list = el('div', { class: 'stack', style: { gap: '6px' } });
+    if (!users.length) list.appendChild(el('p', { class: 'field__hint', text: 'Wala pang ibang users.' }));
+    users.forEach((usr) => {
+      const isSelf = me && usr.id === me.id;
+      const roleSel = select(['Advertiser', 'Graphic Artist'], {
+        value: usr.role === 'Advertiser' ? 'Advertiser' : 'Graphic Artist',
+        onChange: async (e) => {
+          const next = e.target.value;
+          roleSel.disabled = true;
+          try { await auth.setUserRole(usr.id, next); usr.role = next; toast(`${usr.name || usr.email}: ${next}`, 'success'); }
+          catch (err) { toast(err.message, 'error'); roleSel.value = usr.role; }
+          finally { roleSel.disabled = false; }
+        },
+      });
+      roleSel.style.width = 'auto';
+      const row = el('div', { class: 'spread', style: { padding: '9px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', gap: '12px' } },
+        el('div', { style: { minWidth: '0' } },
+          el('div', { style: { fontWeight: '600' }, text: (usr.name || '(no name)') + (isSelf ? ' (ikaw)' : '') }),
+          el('div', { class: 'field__hint', style: { margin: '0' }, text: usr.email || usr.id }),
+        ),
+        roleSel,
+      );
+      list.appendChild(row);
+    });
+    host.appendChild(list);
+  }
 }
 const ICON_USER = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
 const identityBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnIdentity', title: 'Account', onClick: openIdentityModal });
