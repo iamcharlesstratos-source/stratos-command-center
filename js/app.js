@@ -468,7 +468,7 @@ function openIdentityModal() {
   const roleLine = local
     ? '📴 Local mode — you signed in on this device only (no Supabase account). Cloud Sync still works.'
     : u
-      ? (admin ? '🛡️ Advertiser (admin) — full access to every module and setting.'
+      ? (admin ? `🛡️ ${u.role} (admin) — full access to every module and setting.`
                : '🎨 Graphic Artist — view and update the creatives assigned to you. Everything else is read-only.')
       : 'Not logged in.';
   openModal({
@@ -598,8 +598,8 @@ function openUserManagement() {
     if (!users.length) list.appendChild(el('p', { class: 'field__hint', text: 'No other users yet.' }));
     users.forEach((usr) => {
       const isSelf = me && usr.id === me.id;
-      const roleSel = select(['Advertiser', 'Graphic Artist'], {
-        value: usr.role === 'Advertiser' ? 'Advertiser' : 'Graphic Artist',
+      const roleSel = select(auth.ROLES, {
+        value: auth.ROLES.includes(usr.role) ? usr.role : 'Graphic Artist',
         onChange: async (e) => {
           const next = e.target.value;
           roleSel.disabled = true;
@@ -662,8 +662,10 @@ async function renderTeamPanel() {
   };
 
   navTeamEl.appendChild(el('div', { class: 'nav-team__title', text: 'Team' }));
+  const heads = users.filter((u) => u.role === 'Marketing Head');
   const advs = users.filter((u) => u.role === 'Advertiser');
-  const gas = users.filter((u) => u.role !== 'Advertiser');
+  const gas = users.filter((u) => u.role !== 'Marketing Head' && u.role !== 'Advertiser');
+  const g0 = groupEl('Marketing Heads', heads); if (g0) navTeamEl.appendChild(g0);
   const g1 = groupEl('Advertisers', advs); if (g1) navTeamEl.appendChild(g1);
   const g2 = groupEl('Graphic Artists', gas); if (g2) navTeamEl.appendChild(g2);
   if (auth.isAdmin()) {
@@ -726,14 +728,14 @@ function showLogin() {
       const nameInput = input({ placeholder: 'Name (e.g. Charles)', autocomplete: 'name' });
       const emailInput = input({ type: 'email', placeholder: 'you@email.com', autocomplete: 'username' });
       const pwInput = input({ type: 'password', placeholder: '••••••••', autocomplete: mode === 'signin' ? 'current-password' : 'new-password' });
-      let roleSeg = null;
+      let roleSel = null;
 
       if (mode === 'signup') card.appendChild(field('Name', nameInput));
       card.appendChild(field('Email', emailInput));
       card.appendChild(field('Password', pwInput, mode === 'signup' ? { hint: 'At least 6 characters.' } : undefined));
       if (mode === 'signup') {
-        roleSeg = segmented(['Advertiser', 'Graphic Artist'], 'Advertiser', () => {});
-        card.appendChild(field('Role', roleSeg, { hint: 'Advertiser = admin (full access). Graphic Artist = view + own creatives only.' }));
+        roleSel = select(auth.ROLES, { value: 'Advertiser' });
+        card.appendChild(field('Role', roleSel, { hint: 'Marketing Head & Advertiser = admin (full access). Graphic Artist = view + own creatives only.' }));
       }
 
       card.appendChild(msg);
@@ -783,8 +785,7 @@ function showLogin() {
           if (!email || !pw) throw new Error('Email and password are required.');
           let user;
           if (mode === 'signup') {
-            const activeBtn = roleSeg.querySelector('button.active');
-            const roleVal = (activeBtn ? activeBtn.textContent : 'Advertiser').trim();
+            const roleVal = (roleSel && roleSel.value) || 'Advertiser';
             user = await auth.signUp(email, pw, { role: roleVal, name: nameInput.value.trim() });
           } else {
             user = await auth.signIn(email, pw);

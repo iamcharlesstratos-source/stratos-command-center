@@ -12,6 +12,11 @@ const SKEY = 'stratos:auth';
 let session = null;                 // { access_token, refresh_token, expires_at, user:{id,email,role,name} }
 const listeners = new Set();
 
+// Roles. Marketing Head + Advertiser are admins (full access); Graphic Artist is limited.
+export const ROLES = ['Marketing Head', 'Advertiser', 'Graphic Artist'];
+const ADMIN_ROLES = ['Marketing Head', 'Advertiser'];
+function normRole(r, fallback = 'Graphic Artist') { return ROLES.includes(r) ? r : fallback; }
+
 // Fall back to the baked-in workspace when a stored config has empty sync creds
 // (older stored configs persisted url:'' which would otherwise mask the default).
 function creds() {
@@ -39,14 +44,14 @@ function shape(data) {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: data.expires_at ? data.expires_at * 1000 : Date.now() + (data.expires_in || 3600) * 1000,
-    user: { id: u.id, email: u.email, role: meta.role === 'Graphic Artist' ? 'Graphic Artist' : 'Advertiser', name: meta.name || (u.email || '').split('@')[0], avatar: meta.avatar || '' },
+    user: { id: u.id, email: u.email, role: normRole(meta.role, 'Advertiser'), name: meta.name || (u.email || '').split('@')[0], avatar: meta.avatar || '' },
   };
 }
 
 export function current() { return session ? session.user : null; }
 export function isAuthed() { return !!(session && (session.access_token || session.local)); }
 export function isLocal() { return !!(session && session.local); }
-export function isAdmin() { return isAuthed() && session.user.role === 'Advertiser'; }
+export function isAdmin() { return isAuthed() && ADMIN_ROLES.includes(session.user.role); }
 export function role() { return session ? session.user.role : null; }
 export function token() { return session ? session.access_token : null; }
 export function hasStoredSession() { return !!localStorage.getItem(SKEY); }
@@ -143,7 +148,7 @@ async function syncProfile() {
     await putProfile({ id: u.id, email: u.email, name: u.name, role: u.role });
     return;
   }
-  const role = prof.role === 'Advertiser' ? 'Advertiser' : 'Graphic Artist';
+  const role = normRole(prof.role);
   session.user.role = role;
   if (prof.name) session.user.name = prof.name;
   if (prof.avatar) session.user.avatar = prof.avatar;
@@ -181,7 +186,7 @@ export async function updateProfile({ name, avatar } = {}) {
 
 /** Admin: change a member's role (takes effect on their next login/refresh). */
 export async function setUserRole(id, role) {
-  const r = role === 'Advertiser' ? 'Advertiser' : 'Graphic Artist';
+  const r = normRole(role);
   const res = await fetch(rest() + '/stratos_profiles?id=eq.' + encodeURIComponent(id), {
     method: 'PATCH',
     headers: authedHeaders({ Prefer: 'return=minimal' }),
