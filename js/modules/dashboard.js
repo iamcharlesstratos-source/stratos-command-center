@@ -7,6 +7,8 @@ import * as metrics from '../metrics.js';
 import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, lineChart, barChart, countUp } from '../ui.js';
 import { todayStr, yesterdayStr } from '../util.js';
 
+const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
+
 const MODULES = [
   { route: 'products', title: 'Product Testing', desc: 'R&D, scoring, offers, pricing & launch readiness — the hub.' },
   { route: 'creatives', title: 'Creative Testing', desc: 'Brief, assign & rank image/video creatives.' },
@@ -25,17 +27,19 @@ export function render(view) {
 
   view.appendChild(pageHeader(
     'Today', `Mga dapat aksyunan ngayon · ${today}`,
-    products.length ? [button('+ New product', { variant: 'primary', onClick: () => { location.hash = '#/products'; } })] : [],
+    (products.length && isAdmin()) ? [button('+ New product', { variant: 'primary', onClick: () => { location.hash = '#/products'; } })] : [],
   ));
 
   // ---- empty state ----
   if (s.products === 0 && s.creatives === 0 && s.competitors === 0) {
     view.appendChild(card('Get started',
-      el('p', { class: 'muted', text: 'No data yet. Load a small sample dataset (2 products with creatives, daily metrics, pages & competitors) to explore every module, or jump straight into adding your first product.' }),
-      el('div', { class: 'row', style: { marginTop: '8px' } },
+      isAdmin()
+        ? el('p', { class: 'muted', text: 'No data yet. Load a small sample dataset (2 products with creatives, daily metrics, pages & competitors) to explore every module, or jump straight into adding your first product.' })
+        : el('p', { class: 'muted', text: 'Wala pang data. Hintayin ang Advertiser na mag-set up — pagkatapos makikita mo dito ang mga creatives na assigned sa iyo.' }),
+      isAdmin() ? el('div', { class: 'row', style: { marginTop: '8px' } },
         button('Load sample data', { variant: 'primary', onClick: () => loadSample(view) }),
         button('Start with a product', { variant: 'ghost', onClick: () => { location.hash = '#/products'; } }),
-      ),
+      ) : null,
     ));
     return;
   }

@@ -505,3 +505,42 @@ body.density-compact .btn { padding: 6px 11px; }
 .popover-menu__item:hover { background: var(--surface-2); }
 .popover-menu__hint { margin-left: auto; font-size: 11px; color: var(--text-dim); text-transform: capitalize; }
 .popover-menu__divider { height: 1px; background: var(--border); margin: 5px 4px; }
+
+/* =========================================================================
+   Login gate (full-screen, real Supabase Auth)
+   ========================================================================= */
+.auth-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background:
+    radial-gradient(900px 500px at 50% -10%, rgba(139, 92, 246, 0.18), transparent 60%),
+    var(--bg);
+  overflow-y: auto;
+  animation: stratos-rise .25s ease both;
+}
+.auth-card {
+  width: 100%; max-width: 380px; margin: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 28px 26px 24px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.auth-brand { display: flex; align-items: center; gap: 10px; }
+.auth-brand .orbital-mark { width: 32px; height: 32px; flex: none; }
+.auth-brand__name { font-family: var(--font-display, inherit); font-weight: 700; font-size: 20px; letter-spacing: .14em; }
+.auth-sub { color: var(--text-dim); font-size: 13px; margin: -4px 0 6px; }
+.auth-note { font-size: 12px; color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.auth-card .field { display: flex; flex-direction: column; gap: 5px; }
+.auth-msg { font-size: 12.5px; line-height: 1.4; }
+.auth-msg:empty { display: none; }
+.auth-msg--bad { color: var(--bad); }
+.auth-msg--ok { color: var(--good); }
+.auth-switch { text-align: center; font-size: 12.5px; margin-top: 4px; }
+.auth-switch a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.auth-switch a:hover { text-decoration: underline; }
+@media (max-width: 480px) { .auth-card { padding: 24px 18px 20px; } }
+
+/* inline notice banner (e.g. read-only role notice) */
+.banner { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); font-size: 13px; }
+.banner--info { border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.10); color: var(--text); }
+.banner--warn { border-color: rgba(245, 185, 69, 0.4); background: var(--warn-bg); color: var(--text); }

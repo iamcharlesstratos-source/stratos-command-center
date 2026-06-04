@@ -13,6 +13,7 @@
 //   (subscribe / exportAll / importAll / getConfig).
 
 import * as store from './store.js';
+import * as auth from './auth.js';
 
 const state = { status: 'off', detail: '', timer: null, applying: false, lastBody: '', lastPulledAt: '' };
 let statusCb = null;
@@ -25,7 +26,13 @@ function setStatus(s, detail = '') { state.status = s; state.detail = detail; if
 function cfg() { return store.getConfig().sync || {}; }
 export function isEnabled() { const c = cfg(); return !!(c.enabled && c.url && c.anonKey); }
 function endpoint() { return cfg().url.replace(/\/+$/, '') + '/rest/v1/stratos_kv'; }
-function headers(extra) { const c = cfg(); return { apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey, 'Content-Type': 'application/json', ...extra }; }
+function headers(extra) {
+  const c = cfg();
+  // Use the logged-in user's JWT when available (lets RLS require authenticated);
+  // fall back to the anon key for the pre-login seed / open-table setups.
+  const tok = (auth.token && auth.token()) || c.anonKey;
+  return { apikey: c.anonKey, Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json', ...extra };
+}
 
 /** DATA-only snapshot (config stripped). */
 function snapshotData() { const all = store.exportAll(); const d = { ...all.data }; delete d.config; return d; }

@@ -17,6 +17,8 @@ import { todayStr, toNum } from '../util.js';
 
 const STATUSES = ['To Do', 'In Progress', 'For Review', 'Approved', 'Launched', 'Winner', 'Loser'];
 const APPROVED_SET = ['Approved', 'Launched', 'Winner'];
+// Advertisers are admins; Graphic Artists can work creatives but not leaderboard/team settings.
+const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
 let viewMode = 'tables'; // 'tables' | 'board'
 let mineOnly = null;     // null = uninitialized; set from role on first render
 let mineOnlyRole = null; // re-init the filter when the role changes
@@ -39,8 +41,8 @@ export function render(view) {
     [
       me ? button(mineOnly ? '◉ Mine only' : '○ All', { variant: 'ghost', title: 'Filter to creatives assigned to you', onClick: () => { mineOnly = !mineOnly; rerender(view); } }) : null,
       button(viewMode === 'tables' ? 'Board view' : 'Table view', { variant: 'ghost', onClick: () => { viewMode = viewMode === 'tables' ? 'board' : 'tables'; rerender(view); } }),
-      button('Rank weights', { variant: 'ghost', onClick: () => openWeightsModal(view) }),
-      button('Manage team', { variant: 'ghost', onClick: () => openTeamModal(view) }),
+      isAdmin() ? button('Rank weights', { variant: 'ghost', onClick: () => openWeightsModal(view) }) : null,
+      isAdmin() ? button('Manage team', { variant: 'ghost', onClick: () => openTeamModal(view) }) : null,
       button('+ New creative', { variant: 'primary', onClick: () => openCreativeModal(view) }),
     ].filter(Boolean),
   ));

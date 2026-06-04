@@ -6,7 +6,8 @@ import * as store from './store.js';
 import * as metrics from './metrics.js';
 import * as ai from './ai.js';
 import * as sync from './sync.js';
-import { el, clear, button, openModal, confirmDialog, toast, field, input, pageHeader, popoverMenu } from './ui.js';
+import * as auth from './auth.js';
+import { el, clear, button, openModal, confirmDialog, toast, field, input, pageHeader, popoverMenu, orbitalMark } from './ui.js';
 import { todayStr } from './util.js';
 
 // Module views (each exports `render(view, params)`).
@@ -397,54 +398,185 @@ _actions.appendChild(moreBtn);
 // Identity + role (Advertiser / Graphic Artist)
 // ---------------------------------------------------------------------------
 function openIdentityModal() {
-  const ui = store.getConfig().ui || {};
-  const draft = { userName: ui.userName || '', role: ui.role || 'Advertiser' };
-  const nameInput = input({ value: draft.userName, placeholder: 'Pangalan mo (hal. Charles)' });
-  nameInput.addEventListener('input', (e) => { draft.userName = e.target.value; });
-  const roleSeg = segmented(['Advertiser', 'Graphic Artist'], draft.role, (v) => { draft.role = v; });
+  const u = auth.current();
+  const admin = auth.isAdmin();
+  const roleLine = u
+    ? (admin ? '🛡️ Advertiser (admin) — full access sa lahat ng module at settings.'
+             : '🎨 Graphic Artist — view + i-update ang mga creatives na assigned sa iyo. Read-only ang iba.')
+    : 'Hindi naka-log in.';
   openModal({
-    title: 'Sino ka? (Role)', width: 480,
+    title: 'Account', width: 440,
     body: el('div', { class: 'stack' },
-      el('p', { class: 'field__hint', text: 'Para iangkop ang view sa trabaho mo. Naka-save lang ito sa browser na ito (per person).' }),
-      field('Pangalan', nameInput, { hint: 'Ginagamit din bilang "assignee" sa creatives.' }),
-      field('Role', roleSeg, { hint: 'Advertiser = buong command center. Graphic Artist = naka-focus sa creatives na naka-assign sa iyo.' }),
+      el('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } },
+        el('b', { text: u ? u.name : 'Guest', style: { fontSize: '16px' } }),
+        u ? el('span', { class: 'pill ' + (admin ? 'pill--good' : 'pill--neutral'), text: u.role }) : null,
+      ),
+      u && u.email ? el('p', { class: 'field__hint', style: { margin: '0' }, text: u.email }) : null,
+      el('p', { class: 'field__hint', text: roleLine }),
     ),
     actions: [
-      { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
-      { label: 'Save', variant: 'primary', onClick: (close) => {
-        const name = draft.userName.trim();
-        const cfg = store.getConfig();
-        const team = [...(cfg.team || [])];
-        if (name && !team.includes(name)) team.push(name);
-        store.updateConfig({ ui: { userName: name, role: draft.role }, team });
-        updateIdentityChip();
-        toast(`Role: ${draft.role}${name ? ' · ' + name : ''}`, 'success');
-        close(); renderRoute();
+      { label: 'Close', variant: 'ghost', onClick: (close) => close() },
+      { label: 'Log out', variant: 'danger', onClick: async (close) => {
+        close();
+        try { await auth.signOut(); } catch (e) { /* ignore */ }
+        location.reload();
       } },
     ],
   });
 }
 const ICON_USER = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
-const identityBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnIdentity', title: 'Your role', onClick: openIdentityModal });
+const identityBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnIdentity', title: 'Account', onClick: openIdentityModal });
 function updateIdentityChip() {
+  const u = auth.current();
   const ui = store.getConfig().ui || {};
+  const name = (u && u.name) || ui.userName || '';
+  const r = (u && u.role) || ui.role || 'Advertiser';
   identityBtn.innerHTML = ICON_USER;
-  identityBtn.appendChild(el('span', { text: ui.userName ? `${ui.userName} · ${ui.role || 'Advertiser'}` : 'Set role', style: { marginLeft: '6px' } }));
+  identityBtn.appendChild(el('span', { text: name ? `${name} · ${r}` : 'Account', style: { marginLeft: '6px' } }));
 }
 _actions.insertBefore(identityBtn, _actions.firstChild);
 updateIdentityChip();
 
 // expose for modules that need to open settings (e.g. AI buttons before config)
 // and as a debugging affordance for this internal tool.
-window.STRATOS = { openAiSettings, openSyncSettings, openCommandPalette, applyUiPrefs, refreshChrome, renderRoute, store, metrics, ai, sync };
+window.STRATOS = { openAiSettings, openSyncSettings, openCommandPalette, applyUiPrefs, refreshChrome, renderRoute, store, metrics, ai, sync, auth, isAdmin: () => auth.isAdmin() };
 
 // ---------------------------------------------------------------------------
-// Boot
+// Role gating — hide admin-only chrome for Graphic Artists
 // ---------------------------------------------------------------------------
-if (!location.hash) {
-  const role = (store.getConfig().ui || {}).role;
-  location.replace(role === 'Graphic Artist' ? '#/creatives' : '#/dashboard');
+function applyRoleGating() {
+  const admin = auth.isAdmin();
+  document.body.classList.toggle('role-artist', !admin);
+  // The ⋯ menu holds Import / Export / Cloud Sync / AI Settings — admin-only.
+  if (moreBtn) moreBtn.style.display = admin ? '' : 'none';
 }
-refreshChrome();
-renderRoute();
-sync.start(renderRoute); // no-op until Cloud Sync is configured & enabled
+
+// ---------------------------------------------------------------------------
+// Login screen (full-screen gate; real Supabase Auth)
+// ---------------------------------------------------------------------------
+function showLogin() {
+  return new Promise((resolve) => {
+    let mode = 'signin';        // 'signin' | 'signup'
+    let pendingMsg = null;      // { kind:'ok'|'bad', text } carried across re-renders
+    const overlay = el('div', { class: 'auth-overlay' });
+    const card = el('div', { class: 'auth-card' });
+    overlay.appendChild(card);
+
+    function render() {
+      clear(card);
+      const brand = el('div', { class: 'auth-brand' });
+      brand.appendChild(orbitalMark(32, { spin: false }));
+      brand.appendChild(el('div', { class: 'auth-brand__name', text: 'STRATOS' }));
+      card.appendChild(brand);
+      card.appendChild(el('div', { class: 'auth-sub', text: mode === 'signin' ? 'Mag-log in sa Command Center' : 'Gumawa ng bagong account' }));
+
+      const msg = el('div', { class: 'auth-msg' });
+      if (pendingMsg) { msg.classList.add(pendingMsg.kind === 'ok' ? 'auth-msg--ok' : 'auth-msg--bad'); msg.textContent = pendingMsg.text; pendingMsg = null; }
+
+      // Workspace fields only while the Supabase project isn't connected yet.
+      let wsUrl = null, wsKey = null;
+      if (!auth.isConfigured()) {
+        const s = store.getConfig().sync || {};
+        wsUrl = input({ value: s.url || '', placeholder: 'https://xxxx.supabase.co', autocomplete: 'off' });
+        wsKey = input({ value: s.anonKey || '', placeholder: 'anon public key', type: 'password', autocomplete: 'off' });
+        card.appendChild(el('div', { class: 'auth-note', text: 'Una, ikonekta ang team workspace (Supabase → Settings → API).' }));
+        card.appendChild(field('Workspace URL', wsUrl));
+        card.appendChild(field('Workspace key (anon public)', wsKey));
+      }
+
+      const nameInput = input({ placeholder: 'Pangalan (hal. Charles)', autocomplete: 'name' });
+      const emailInput = input({ type: 'email', placeholder: 'ikaw@email.com', autocomplete: 'username' });
+      const pwInput = input({ type: 'password', placeholder: '••••••••', autocomplete: mode === 'signin' ? 'current-password' : 'new-password' });
+      let roleSeg = null;
+
+      if (mode === 'signup') card.appendChild(field('Pangalan', nameInput));
+      card.appendChild(field('Email', emailInput));
+      card.appendChild(field('Password', pwInput, mode === 'signup' ? { hint: 'Hindi bababa sa 6 na karakter.' } : undefined));
+      if (mode === 'signup') {
+        roleSeg = segmented(['Advertiser', 'Graphic Artist'], 'Advertiser', () => {});
+        card.appendChild(field('Role', roleSeg, { hint: 'Advertiser = admin (buong access). Graphic Artist = view + sariling creatives lang.' }));
+      }
+
+      card.appendChild(msg);
+      const submit = button(mode === 'signin' ? 'Mag-log in' : 'Gumawa ng account', { variant: 'primary', full: true, onClick: doSubmit });
+      card.appendChild(submit);
+
+      const switchRow = el('div', { class: 'auth-switch' },
+        el('span', { class: 'muted', text: mode === 'signin' ? 'Wala pang account? ' : 'May account na? ' }),
+        el('a', { href: '#', text: mode === 'signin' ? 'Mag-sign up' : 'Mag-log in' }),
+      );
+      switchRow.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); mode = mode === 'signin' ? 'signup' : 'signin'; render(); });
+      card.appendChild(switchRow);
+
+      [nameInput, emailInput, pwInput].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSubmit(); } }));
+      setTimeout(() => (mode === 'signup' ? nameInput : emailInput).focus(), 30);
+
+      function setBusy(b) {
+        submit.disabled = b;
+        const lbl = submit.querySelector('span:last-child');
+        if (lbl) lbl.textContent = b ? 'Sandali…' : (mode === 'signin' ? 'Mag-log in' : 'Gumawa ng account');
+      }
+
+      async function doSubmit() {
+        msg.className = 'auth-msg';
+        msg.textContent = '';
+        setBusy(true);
+        try {
+          if (wsUrl && wsKey) {
+            const url = wsUrl.value.trim(), key = wsKey.value.trim();
+            if (!url || !key) throw new Error('Kailangan ang Workspace URL at key.');
+            store.updateConfig({ sync: { url, anonKey: key, enabled: true } });
+          }
+          if (!auth.isConfigured()) throw new Error('Kulang ang workspace settings (URL + key).');
+          const email = emailInput.value.trim();
+          const pw = pwInput.value;
+          if (!email || !pw) throw new Error('Email at password ang kailangan.');
+          let user;
+          if (mode === 'signup') {
+            const activeBtn = roleSeg.querySelector('button.active');
+            const roleVal = (activeBtn ? activeBtn.textContent : 'Advertiser').trim();
+            user = await auth.signUp(email, pw, { role: roleVal, name: nameInput.value.trim() });
+          } else {
+            user = await auth.signIn(email, pw);
+          }
+          overlay.remove();
+          resolve(user);
+        } catch (e) {
+          if (e.message === 'CONFIRM_EMAIL') {
+            pendingMsg = { kind: 'ok', text: '✅ Account created! I-check ang email mo para i-confirm, tapos mag-log in.' };
+            mode = 'signin';
+            render();
+          } else {
+            msg.className = 'auth-msg auth-msg--bad';
+            msg.textContent = e.message;
+            setBusy(false);
+          }
+        }
+      }
+    }
+
+    render();
+    document.body.appendChild(overlay);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Boot — gate the whole app behind login
+// ---------------------------------------------------------------------------
+(async () => {
+  let user = null;
+  if (auth.isConfigured()) { try { user = await auth.init(); } catch (e) { /* expired / offline → fall through to login */ } }
+  if (!user) { try { user = await showLogin(); } catch (e) { /* user closed? keep gated */ } }
+  if (user) store.updateConfig({ ui: { role: user.role, userName: user.name } });
+
+  updateIdentityChip();
+  applyRoleGating();
+
+  if (!location.hash) {
+    const role = (store.getConfig().ui || {}).role;
+    location.replace(role === 'Graphic Artist' ? '#/creatives' : '#/dashboard');
+  }
+  refreshChrome();
+  renderRoute();
+  sync.start(renderRoute); // no-op until Cloud Sync is configured & enabled
+})();

@@ -20,6 +20,9 @@ import { toNum, nowISO, todayStr } from '../util.js';
 const SAMPLE_STATUS = ['Not ordered', 'Ordered', 'Shipped', 'Received', 'Approved', 'Rejected'];
 const CATEGORIES = ['Supplements', 'Skincare', 'Beauty', 'Health', 'Home', 'Gadgets', 'Fashion', 'Other'];
 
+// Advertisers are admins; Graphic Artists get a read-only view of products.
+const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
+
 export function render(view, params) {
   if (params && params[0]) renderDetail(view, decodeURIComponent(params[0]));
   else renderList(view);
@@ -35,15 +38,16 @@ function renderList(view) {
   view.appendChild(pageHeader(
     'Product Testing Command Center',
     'Every product runs through one pipeline — R&D → scoring → offer → pricing → launch.',
-    [
+    isAdmin() ? [
       button('Auto-tag rules', { variant: 'ghost', onClick: openThresholdsModal }),
       button('+ New product', { variant: 'primary', onClick: openNewProductModal }),
-    ],
+    ] : [],
   ));
 
   if (!products.length) {
-    view.appendChild(emptyState('No products yet. Create your first product to start the pipeline.',
-      button('+ New product', { variant: 'primary', onClick: openNewProductModal })));
+    view.appendChild(emptyState(
+      isAdmin() ? 'No products yet. Create your first product to start the pipeline.' : 'Wala pang products. (Advertiser lang ang pwedeng mag-add.)',
+      isAdmin() ? button('+ New product', { variant: 'primary', onClick: openNewProductModal }) : null));
     return;
   }
 
@@ -93,7 +97,7 @@ function readinessMini(pct) {
 function rowActions(p) {
   const wrap = el('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end' } });
   wrap.appendChild(button('Open', { variant: 'ghost', onClick: () => { location.hash = `#/products/${encodeURIComponent(p.code)}`; } }));
-  wrap.appendChild(button('✕', { variant: 'subtle', title: 'Delete product', onClick: (e) => deleteProductFlow(p) }));
+  if (isAdmin()) wrap.appendChild(button('✕', { variant: 'subtle', title: 'Delete product', onClick: (e) => deleteProductFlow(p) }));
   return wrap;
 }
 
@@ -210,14 +214,19 @@ function renderDetail(view, code) {
     ),
     el('h2', { class: 'page-title', text: draft.name || '(unnamed product)', style: { marginTop: '8px' } }),
   );
+  const admin = isAdmin();
   const actions = el('div', { class: 'page-head__actions' },
     button('← All', { variant: 'ghost', onClick: () => { location.hash = '#/products'; } }),
-    button('Rename code', { variant: 'ghost', onClick: () => renameFlow(draft.code) }),
-    button('Delete', { variant: 'danger', onClick: () => deleteProductFlow(draft) }),
-    button('Save changes', { variant: 'primary', onClick: save }),
+    admin ? button('Rename code', { variant: 'ghost', onClick: () => renameFlow(draft.code) }) : null,
+    admin ? button('Delete', { variant: 'danger', onClick: () => deleteProductFlow(draft) }) : null,
+    admin ? button('Save changes', { variant: 'primary', onClick: save }) : null,
   );
   head.appendChild(left); head.appendChild(actions);
   view.appendChild(head);
+  if (!admin) {
+    view.appendChild(el('div', { class: 'banner banner--info', style: { marginBottom: 'var(--gap)' } },
+      el('span', { text: '👁️ Read-only view — Graphic Artist ka. Advertiser lang ang pwedeng mag-edit ng products.' })));
+  }
 
   // ---- live-derived panels recompute from the draft ----
   const derivedHost = el('div', { class: 'grid grid-3', style: { marginBottom: 'var(--gap)' } });

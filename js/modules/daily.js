@@ -17,6 +17,9 @@ import { todayStr, yesterdayStr, toNum, debounce } from '../util.js';
 
 let selectedDate = todayStr();
 
+// Advertisers are admins; Graphic Artists view metrics read-only (no entry/import).
+const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
+
 // subtle performance tints (work on both themes)
 const HEAT = { good: 'rgba(45,212,167,0.18)', warn: 'rgba(245,185,69,0.16)', bad: 'rgba(244,80,107,0.16)' };
 const roasHeat = (r, cfg) => { const l = metrics.labelForRoas(r, cfg.thresholds); return l === 'Scale' ? HEAT.good : l === 'Observe' ? HEAT.warn : l === 'Kill' ? HEAT.bad : null; };
@@ -33,10 +36,10 @@ export function render(view) {
     'Daily Marketing Dashboard',
     'Which product is winning, losing, or ready to scale — for the selected day.',
     [
-      button('⇪ Paste import', { variant: 'ghost', onClick: () => openImportModal(view) }),
+      isAdmin() ? button('⇪ Paste import', { variant: 'ghost', onClick: () => openImportModal(view) }) : null,
       el('div', { class: 'row', style: { alignItems: 'center', gap: '8px' } },
         el('span', { class: 'field__label', text: 'Date' }), dateInput),
-    ],
+    ].filter(Boolean),
   ));
 
   if (!products.length) {
@@ -65,8 +68,13 @@ export function render(view) {
     statTile('CTR', metrics.fmt(agg.ctr, 'ctr')),
   ));
 
-  // ---- entry grid ----
-  view.appendChild(renderEntry(view, products));
+  // ---- entry grid (Advertiser-only; artists see metrics read-only) ----
+  if (isAdmin()) {
+    view.appendChild(renderEntry(view, products));
+  } else {
+    view.appendChild(el('div', { class: 'banner banner--info', style: { marginBottom: 'var(--gap)' } },
+      el('span', { text: '👁️ Read-only — Graphic Artist ka. Advertiser lang ang nag-eencode ng daily metrics.' })));
+  }
 
   // ---- scaling recommendations ----
   view.appendChild(renderRecommendations(products, cfg));
@@ -322,6 +330,12 @@ function renderPagePerformance(cfg) {
 function renderReportPanel() {
   const existing = store.getDailyReport(selectedDate);
   const ta = textarea({ value: existing, rows: 6, placeholder: 'Daily marketing report (Taglish). Generate with AI or write here…' });
+
+  if (!isAdmin()) {
+    ta.setAttribute('readonly', '');
+    return card('AI Daily Report — ' + selectedDate,
+      existing ? ta : el('p', { class: 'muted', style: { margin: 0 }, text: 'Wala pang report para sa araw na ito.' }));
+  }
 
   function buildDataSummary() {
     const cfg = store.getConfig();
