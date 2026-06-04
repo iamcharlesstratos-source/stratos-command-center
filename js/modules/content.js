@@ -62,7 +62,7 @@ const state = { code: '', platform: 'Facebook', tone: 'emotional', framework: 'N
 
 export function render(view) {
   const products = store.getProducts();
-  view.appendChild(pageHeader('AI Content & Caption Generator', 'On-brand captions, hooks, headlines, scripts, objection-busters & chatbot replies — in Taglish.'));
+  view.appendChild(pageHeader('AI Content & Caption Generator', 'On-brand captions, hooks, headlines, scripts, objection-busters & chatbot replies — in your chosen language.'));
 
   if (!products.length) {
     view.appendChild(emptyState('Add a product first (Module 1) — content is generated from a product\'s context.',
@@ -261,7 +261,7 @@ function defaultImagePrompt(product, styleKey) {
 
 function openImageGen(view) {
   const product = store.getProduct(state.code);
-  if (!product) { toast('Pumili muna ng product.', 'warn'); return; }
+  if (!product) { toast('Pick a product first.', 'warn'); return; }
 
   let seed = Math.floor(Math.random() * 1e6);
   let currentUrl = '';
@@ -286,19 +286,19 @@ function openImageGen(view) {
     return `https://image.pollinations.ai/prompt/${p}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`;
   }
   function generate() {
-    if (!promptTa.value.trim()) { toast('Magsulat ng prompt.', 'warn'); return; }
+    if (!promptTa.value.trim()) { toast('Write a prompt.', 'warn'); return; }
     currentUrl = buildUrl();
     clear(imgWrap);
     status.style.color = 'var(--text-dim)';
-    status.textContent = 'Gumagawa ng larawan… (mga 10–25 segundo)';
+    status.textContent = 'Generating image… (about 10–25 seconds)';
     const img = el('img', { alt: 'AI ad creative', style: { width: '100%', maxWidth: '340px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'block' } });
-    img.addEventListener('load', () => { status.style.color = 'var(--good)'; status.textContent = '✅ Tapos. I-regenerate para sa ibang bersyon, o i-save.'; });
-    img.addEventListener('error', () => { status.style.color = 'var(--bad)'; status.textContent = 'Hindi ma-generate. Subukan ulit o palitan ang prompt.'; });
+    img.addEventListener('load', () => { status.style.color = 'var(--good)'; status.textContent = '✅ Done. Regenerate for another version, or save.'; });
+    img.addEventListener('error', () => { status.style.color = 'var(--bad)'; status.textContent = 'Couldn\'t generate. Try again or change the prompt.'; });
     imgWrap.appendChild(img);
     img.src = currentUrl;
   }
   function autoPrompt() {
-    if (!ai.isConfigured()) { toast('I-set up muna ang AI (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
+    if (!ai.isConfigured()) { toast('Set up AI first (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
     const prev = promptTa.value;
     promptTa.value = 'Writing prompt…';
     ai.generate(
@@ -310,7 +310,7 @@ function openImageGen(view) {
 
   const body = el('div', { class: 'stack' },
     el('div', { class: 'form-grid' }, field('Style', styleSel), field('Ratio', ratioSel)),
-    field('Prompt', promptTa, { hint: 'Auto-filled mula sa product — pwede i-edit. English ang pinakaok para sa image AI.' }),
+    field('Prompt', promptTa, { hint: 'Auto-filled from the product — you can edit it. English works best for the image AI.' }),
     el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
       button('✨ Auto-write prompt', { variant: 'ghost', onClick: autoPrompt }),
       button('🎨 Generate', { variant: 'primary', onClick: generate }),
@@ -318,18 +318,18 @@ function openImageGen(view) {
     ),
     status,
     imgWrap,
-    el('p', { class: 'field__hint', text: 'Pang-concept / mockup / brief ito sa graphic artist — hindi pang-final na ad.' }),
+    el('p', { class: 'field__hint', text: 'This is a concept / mockup / brief for the graphic artist — not a final ad.' }),
   );
 
   openModal({
     title: `AI ad image — ${product.code}`, width: 600, body,
     actions: [
       { label: 'Close', variant: 'ghost', onClick: (c) => c() },
-      { label: 'Open full', variant: 'ghost', onClick: () => { if (currentUrl) window.open(currentUrl, '_blank'); else toast('Generate muna.', 'warn'); } },
+      { label: 'Open full', variant: 'ghost', onClick: () => { if (currentUrl) window.open(currentUrl, '_blank'); else toast('Generate one first.', 'warn'); } },
       { label: 'Save as creative', variant: 'primary', onClick: (c) => {
-        if (!currentUrl) { toast('Generate muna ng image.', 'warn'); return; }
+        if (!currentUrl) { toast('Generate an image first.', 'warn'); return; }
         store.upsertCreative({ productCode: product.code, type: 'image', title: `AI image: ${promptTa.value.slice(0, 36)}…`, brief: promptTa.value, imageUrl: currentUrl, status: 'To Do' });
-        toast('Na-save sa Creatives (may image).', 'success'); c();
+        toast('Saved to Creatives (with image).', 'success'); c();
       } },
     ],
   });

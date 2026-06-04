@@ -73,7 +73,7 @@ export function render(view) {
     view.appendChild(renderEntry(view, products));
   } else {
     view.appendChild(el('div', { class: 'banner banner--info', style: { marginBottom: 'var(--gap)' } },
-      el('span', { text: '👁️ Read-only — Graphic Artist ka. Advertiser lang ang nag-eencode ng daily metrics.' })));
+      el('span', { text: '👁️ Read-only — you\'re a Graphic Artist. Only Advertisers enter daily metrics.' })));
   }
 
   // ---- scaling recommendations ----
@@ -329,12 +329,12 @@ function renderPagePerformance(cfg) {
 // ---------------------------------------------------------------------------
 function renderReportPanel() {
   const existing = store.getDailyReport(selectedDate);
-  const ta = textarea({ value: existing, rows: 6, placeholder: 'Daily marketing report (Taglish). Generate with AI or write here…' });
+  const ta = textarea({ value: existing, rows: 6, placeholder: 'Daily marketing report. Generate with AI or write here…' });
 
   if (!isAdmin()) {
     ta.setAttribute('readonly', '');
     return card('AI Daily Report — ' + selectedDate,
-      existing ? ta : el('p', { class: 'muted', style: { margin: 0 }, text: 'Wala pang report para sa araw na ito.' }));
+      existing ? ta : el('p', { class: 'muted', style: { margin: 0 }, text: 'No report for this day yet.' }));
   }
 
   function buildDataSummary() {
@@ -475,8 +475,8 @@ function openImportModal(view) {
     const headerChk = el('input', { type: 'checkbox', style: { width: 'auto' } });
     headerChk.checked = hasHeader;
     headerChk.addEventListener('change', () => { headerOverride = headerChk.checked; reparse(); });
-    mapHost.appendChild(el('label', { class: 'row', style: { gap: '8px', alignItems: 'center', fontSize: '12px', marginBottom: '6px' } }, headerChk, el('span', { text: 'Unang row ay column names (header)' })));
-    mapHost.appendChild(el('div', { class: 'field__label', text: 'Itugma ang sarili mong columns:' }));
+    mapHost.appendChild(el('label', { class: 'row', style: { gap: '8px', alignItems: 'center', fontSize: '12px', marginBottom: '6px' } }, headerChk, el('span', { text: 'First row is column names (header)' })));
+    mapHost.appendChild(el('div', { class: 'field__label', text: 'Map your own columns:' }));
     const grid = el('div', { class: 'form-grid' });
     IMPORT_FIELDS.forEach((f) => {
       const opts = [{ value: '-1', label: '— none —' }, ...columnLabels.map((l, i) => ({ value: String(i), label: `${i + 1}. ${l}` }))];
@@ -488,7 +488,7 @@ function openImportModal(view) {
 
   function renderPreview() {
     clear(previewHost);
-    if (!rows.length) { previewHost.appendChild(el('p', { class: 'muted', style: { margin: '8px 0 0' }, text: 'I-paste ang rows, tapos Preview.' })); return; }
+    if (!rows.length) { previewHost.appendChild(el('p', { class: 'muted', style: { margin: '8px 0 0' }, text: 'Paste your rows, then Preview.' })); return; }
     const matched = rows.filter((r) => r.productCode).length;
     previewHost.appendChild(el('p', { class: 'field__hint', html: `Importing to <b>${selectedDate}</b> — <b>${matched}</b>/${rows.length} rows matched a product.` }));
     const cols = [
@@ -511,7 +511,7 @@ function openImportModal(view) {
   reparse();
 
   const body = el('div', { class: 'stack' },
-    el('p', { class: 'field__hint', html: `Paste mula sa Ads Manager o sarili mong spreadsheet (Excel/Sheets). Auto-detect ang header; kung iba ang columns mo, <b>i-map mo lang sa baba</b>. Tab- o comma-separated. Iimport sa <b>${selectedDate}</b> (oo-override ang existing rows ng araw na 'yon).` }),
+    el('p', { class: 'field__hint', html: `Paste from Ads Manager or your own spreadsheet (Excel/Sheets). The header is auto-detected; if your columns differ, <b>just map them below</b>. Tab- or comma-separated. Imports to <b>${selectedDate}</b> (this overwrites existing rows for that day).` }),
     ta,
     el('div', { class: 'row', style: { justifyContent: 'flex-end' } }, button('Preview / re-map', { variant: 'ghost', onClick: reparse })),
     mapHost,

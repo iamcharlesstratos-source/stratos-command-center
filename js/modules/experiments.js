@@ -23,13 +23,13 @@ export function render(view) {
 
   view.appendChild(pageHeader(
     'A/B Tests & Experiments',
-    'I-log ang bawat test — hypothesis, variants, resulta, at kung ano ang nanalo.',
+    'Log every test — hypothesis, variants, results, and which one won.',
     isAdmin() ? [button('+ New experiment', { variant: 'primary', onClick: () => openEditor(view) })] : [],
   ));
 
   if (!experiments.length) {
     view.appendChild(emptyState(
-      isAdmin() ? 'Wala pang test. Gumawa ng una mong experiment — i-compare ang dalawang bersyon at tingnan kung alin ang panalo.' : 'Wala pang experiments.',
+      isAdmin() ? 'No tests yet. Create your first experiment — compare two versions and see which one wins.' : 'No experiments yet.',
       isAdmin() ? button('+ New experiment', { variant: 'primary', onClick: () => openEditor(view) }) : null));
     return;
   }
@@ -117,7 +117,7 @@ function variantCard(v, placeholder, onChange) {
   recompute();
   return el('div', { class: 'card', style: { padding: '12px', background: 'var(--surface-2)' } },
     el('div', { class: 'spread', style: { marginBottom: '6px' } }, el('b', { text: `Variant ${v.label}` }), computed),
-    field('Ano ang kaiba', descInput),
+    field('What\'s different', descInput),
     el('div', { class: 'form-grid' },
       field('Spend ₱', numInput('spend')),
       field('Revenue ₱', numInput('revenue')),
@@ -140,10 +140,10 @@ function openEditor(view, id) {
   const productSel = select([{ value: '', label: '— none —' }, ...products.map((p) => ({ value: p.code, label: `${p.code} — ${p.name}` }))], { value: draft.productCode, onChange: (e) => draft.productCode = e.target.value });
   const typeSel = select(TYPES, { value: draft.type, onChange: (e) => draft.type = e.target.value });
   const statusSeg = seg(STATUSES, draft.status, (v) => draft.status = v);
-  const hypoInput = textarea({ value: draft.hypothesis, rows: 2, placeholder: 'Kung gagamit ng pain-led hook, tataas ang ROAS dahil mas relatable…' });
+  const hypoInput = textarea({ value: draft.hypothesis, rows: 2, placeholder: 'If we use a pain-led hook, ROAS should rise because it\'s more relatable…' });
   hypoInput.addEventListener('input', (e) => draft.hypothesis = e.target.value);
 
-  const winnerSel = select(['', ...draft.variants.map((v) => v.label)].map((l) => ({ value: l, label: l || '— wala pang winner —' })), { value: draft.winner, onChange: (e) => draft.winner = e.target.value });
+  const winnerSel = select(['', ...draft.variants.map((v) => v.label)].map((l) => ({ value: l, label: l || '— no winner yet —' })), { value: draft.winner, onChange: (e) => draft.winner = e.target.value });
   const notesInput = textarea({ value: draft.notes, rows: 2, placeholder: 'Notes / next steps' });
   notesInput.addEventListener('input', (e) => draft.notes = e.target.value);
 
@@ -160,7 +160,7 @@ function openEditor(view, id) {
   renderVerdict();
 
   function runVerdict() {
-    if (!ai.isConfigured()) { toast('I-set up muna ang AI (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
+    if (!ai.isConfigured()) { toast('Set up AI first (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
     const product = draft.productCode ? store.getProduct(draft.productCode) : null;
     const lines = draft.variants.map((v) => {
       const m = metrics.computeMetrics(v);
@@ -190,7 +190,7 @@ function openEditor(view, id) {
       field('Type', typeSel),
     ),
     field('Status', statusSeg),
-    field('Hypothesis', hypoInput, { hint: 'Ano ang inaasahan mong mangyari at bakit?' }),
+    field('Hypothesis', hypoInput, { hint: 'What do you expect to happen, and why?' }),
     el('div', { class: 'field__label', style: { marginTop: '4px' } }, 'Variants'),
     vCards,
     el('div', { class: 'spread', style: { marginTop: '4px' } },
@@ -199,7 +199,7 @@ function openEditor(view, id) {
     ),
     verdictBox,
     field('Notes', notesInput),
-    admin ? null : el('div', { class: 'banner banner--info' }, el('span', { text: '👁️ Read-only — Advertiser lang ang pwedeng mag-edit ng experiments.' })),
+    admin ? null : el('div', { class: 'banner banner--info' }, el('span', { text: '👁️ Read-only — only Advertisers can edit experiments.' })),
   );
 
   const actions = [{ label: 'Close', variant: 'ghost', onClick: (close) => close() }];
@@ -208,7 +208,7 @@ function openEditor(view, id) {
       if (await confirmDialog({ title: 'Delete experiment?', message: draft.name || '(untitled)', confirmText: 'Delete', danger: true })) { store.deleteExperiment(draft.id); toast('Deleted.', 'success'); close(); rerender(view); }
     } });
     actions.push({ label: editing ? 'Save changes' : 'Create', variant: 'primary', onClick: (close) => {
-      if (!draft.name.trim()) { toast('Lagyan ng pangalan ang experiment.', 'warn'); return; }
+      if (!draft.name.trim()) { toast('Give the experiment a name.', 'warn'); return; }
       store.upsertExperiment(draft);
       toast(editing ? 'Experiment saved.' : 'Experiment created.', 'success');
       close(); rerender(view);

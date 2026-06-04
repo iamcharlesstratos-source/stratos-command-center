@@ -435,7 +435,7 @@ function openEditProfile() {
   const fileInput = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
   fileInput.addEventListener('change', () => {
     const f = fileInput.files && fileInput.files[0];
-    if (f) fileToAvatar(f, (d) => { if (d) { avatar = d; renderPreview(); } else toast('Hindi mabasa ang larawan.', 'error'); });
+    if (f) fileToAvatar(f, (d) => { if (d) { avatar = d; renderPreview(); } else toast('Could not read the image.', 'error'); });
   });
   const msg = el('div', { class: 'field__hint', style: { color: 'var(--bad)' } });
   openModal({
@@ -447,13 +447,13 @@ function openEditProfile() {
           button('Upload picture', { variant: 'ghost', onClick: () => fileInput.click() }),
           button('Remove', { variant: 'subtle', onClick: () => { avatar = ''; renderPreview(); } }))),
       fileInput,
-      field('Display name', nameInput, { hint: 'Ginagamit din bilang assignee sa creatives.' }),
+      field('Display name', nameInput, { hint: 'Also used as the assignee name on creatives.' }),
       msg,
     ),
     actions: [
       { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
       { label: 'Save', variant: 'primary', onClick: async (close) => {
-        if (!nameInput.value.trim()) { msg.textContent = 'Kailangan ng display name.'; return; }
+        if (!nameInput.value.trim()) { msg.textContent = 'A display name is required.'; return; }
         try { await auth.updateProfile({ name: nameInput.value, avatar }); updateIdentityChip(); renderTeamPanel(); toast('Profile updated.', 'success'); close(); }
         catch (e) { msg.textContent = e.message; }
       } },
@@ -466,11 +466,11 @@ function openIdentityModal() {
   const admin = auth.isAdmin();
   const local = auth.isLocal();
   const roleLine = local
-    ? '📴 Local mode — pumasok ka sa device na ito (walang Supabase account). Gumagana pa rin ang Cloud Sync.'
+    ? '📴 Local mode — you signed in on this device only (no Supabase account). Cloud Sync still works.'
     : u
-      ? (admin ? '🛡️ Advertiser (admin) — full access sa lahat ng module at settings.'
-               : '🎨 Graphic Artist — view + i-update ang mga creatives na assigned sa iyo. Read-only ang iba.')
-      : 'Hindi naka-log in.';
+      ? (admin ? '🛡️ Advertiser (admin) — full access to every module and setting.'
+               : '🎨 Graphic Artist — view and update the creatives assigned to you. Everything else is read-only.')
+      : 'Not logged in.';
   openModal({
     title: 'Account', width: 440,
     body: el('div', { class: 'stack' },
@@ -554,13 +554,13 @@ create policy "profiles update admin" on public.stratos_profiles for update to a
 
 function renderProfilesSetup() {
   const wrap = el('div', { class: 'stack', style: { gap: '8px' } });
-  wrap.appendChild(el('p', { class: 'field__hint', text: 'I-set up ang User Management — isang beses lang: kopyahin ang SQL → Supabase → SQL Editor → paste → Run, tapos mag-log out / log in ulit.' }));
+  wrap.appendChild(el('p', { class: 'field__hint', text: 'Set up User Management — one time only: copy the SQL → Supabase → SQL Editor → paste → Run, then log out and log back in.' }));
   const ta = el('textarea', { class: 'input', style: { fontFamily: 'var(--mono)', fontSize: '11px', height: '170px', whiteSpace: 'pre', width: '100%' } });
   ta.readOnly = true;
   ta.value = PROFILES_SETUP_SQL;
   ta.addEventListener('focus', () => ta.select());
   const copyBtn = button('📋 Copy SQL', { variant: 'primary', onClick: () => {
-    const done = () => toast('Na-copy ang SQL — i-paste sa Supabase SQL Editor.', 'success');
+    const done = () => toast('SQL copied — paste it into the Supabase SQL Editor.', 'success');
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(PROFILES_SETUP_SQL).then(done).catch(() => { ta.select(); done(); });
     else { ta.select(); try { document.execCommand('copy'); } catch (e) { /* ignore */ } done(); }
   } });
@@ -581,7 +581,7 @@ function openUserManagement() {
 
   async function renderUsers() {
     clear(host);
-    host.appendChild(el('p', { class: 'field__hint', text: 'Lahat ng naka-sign up sa workspace. Baguhin ang role kung kailangan — mag-aapply sa susunod nilang pag-login.' }));
+    host.appendChild(el('p', { class: 'field__hint', text: 'Everyone signed up in this workspace. Change a role as needed — it applies on their next login.' }));
     const loading = el('div', { class: 'loading', style: { padding: '8px 0' } }, orbitalMark(20, { spin: true }), el('span', { text: 'Loading team…' }));
     host.appendChild(loading);
     let users;
@@ -595,7 +595,7 @@ function openUserManagement() {
     loading.remove();
     const me = auth.current();
     const list = el('div', { class: 'stack', style: { gap: '6px' } });
-    if (!users.length) list.appendChild(el('p', { class: 'field__hint', text: 'Wala pang ibang users.' }));
+    if (!users.length) list.appendChild(el('p', { class: 'field__hint', text: 'No other users yet.' }));
     users.forEach((usr) => {
       const isSelf = me && usr.id === me.id;
       const roleSel = select(['Advertiser', 'Graphic Artist'], {
@@ -611,7 +611,7 @@ function openUserManagement() {
       roleSel.style.width = 'auto';
       const row = el('div', { class: 'spread', style: { padding: '9px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', gap: '12px' } },
         el('div', { style: { minWidth: '0' } },
-          el('div', { style: { fontWeight: '600' }, text: (usr.name || '(no name)') + (isSelf ? ' (ikaw)' : '') }),
+          el('div', { style: { fontWeight: '600' }, text: (usr.name || '(no name)') + (isSelf ? ' (you)' : '') }),
           el('div', { class: 'field__hint', style: { margin: '0' }, text: usr.email || usr.id }),
         ),
         roleSel,
@@ -656,7 +656,7 @@ async function renderTeamPanel() {
       const mine = me && m.id === me.id;
       wrap.appendChild(el('div', { class: 'nav-team__member' + (mine ? ' is-me' : ''), title: m.email || '' },
         avatarNode(m, 18),
-        el('span', { class: 'nav-team__name', text: (m.name || (m.email || '').split('@')[0] || '—') + (mine ? ' (ikaw)' : '') })));
+        el('span', { class: 'nav-team__name', text: (m.name || (m.email || '').split('@')[0] || '—') + (mine ? ' (you)' : '') })));
     });
     return wrap;
   };
@@ -749,7 +749,7 @@ function showLogin() {
 
       // Escape hatch — get into the app on THIS device without a Supabase account.
       const localRow = el('div', { class: 'auth-local' },
-        el('a', { href: '#', text: 'Hindi gumagana ang login? Pumasok sa device na ito →' }));
+        el('a', { href: '#', text: 'Login not working? Continue on this device →' }));
       localRow.querySelector('a').addEventListener('click', (e) => {
         e.preventDefault();
         const user = auth.signInLocal((nameInput.value || '').trim() || 'Admin');

@@ -37,7 +37,7 @@ export function render(view) {
 
   view.appendChild(pageHeader(
     ui.role === 'Graphic Artist' ? 'My Creatives' : 'Creative Testing Machine',
-    ui.role === 'Graphic Artist' ? 'Mga creative na naka-assign sa iyo — briefs, deadlines & status.' : 'Brief, assign, track & rank image/video creatives — fast.',
+    ui.role === 'Graphic Artist' ? 'The creatives assigned to you — briefs, deadlines & status.' : 'Brief, assign, track & rank image/video creatives — fast.',
     [
       me ? button(mineOnly ? '◉ Mine only' : '○ All', { variant: 'ghost', title: 'Filter to creatives assigned to you', onClick: () => { mineOnly = !mineOnly; rerender(view); } }) : null,
       button(viewMode === 'tables' ? 'Board view' : 'Table view', { variant: 'ghost', onClick: () => { viewMode = viewMode === 'tables' ? 'board' : 'tables'; rerender(view); } }),
@@ -321,7 +321,7 @@ function openCreativeModal(view, existing) {
     aiRow,
     el('div', { class: 'form-grid' },
       field('Assignee', assigneeSel), field('Deadline', deadlineInput),
-      field('Launch date', launchInput, { hint: '🚀 kailan ilulunsad' }), field('Status', statusSel),
+      field('Launch date', launchInput, { hint: '🚀 when it goes live' }), field('Status', statusSel),
     ),
     e.sourceCompetitorId ? el('div', { class: 'field__hint' }, '↻ Duplicated from competitor ', el('a', { href: '#/competitors', text: 'ad' }), ' #' + e.sourceCompetitorId) : null,
     e.sourceCreativeId ? el('div', { class: 'field__hint' }, '↳ Variant of ', el('a', { href: '#/creatives', text: (store.getCreative(e.sourceCreativeId)?.title) || ('#' + e.sourceCreativeId) })) : null,

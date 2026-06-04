@@ -186,7 +186,7 @@ export async function setUserRole(id, role) {
 
 /** Change the current user's password (GoTrue). */
 export async function updatePassword(newPassword) {
-  if (isLocal()) throw new Error('Local mode — walang Supabase password. Mag-set up ng totoong account para magamit ito.');
+  if (isLocal()) throw new Error('Local mode — no Supabase password. Set up a real account to use this.');
   if (!isAuthed()) throw new Error('Not logged in.');
   let res;
   try {

@@ -46,7 +46,7 @@ function renderList(view) {
 
   if (!products.length) {
     view.appendChild(emptyState(
-      isAdmin() ? 'No products yet. Create your first product to start the pipeline.' : 'Wala pang products. (Advertiser lang ang pwedeng mag-add.)',
+      isAdmin() ? 'No products yet. Create your first product to start the pipeline.' : 'No products yet. (Only an Advertiser can add them.)',
       isAdmin() ? button('+ New product', { variant: 'primary', onClick: openNewProductModal }) : null));
     return;
   }
@@ -225,7 +225,7 @@ function renderDetail(view, code) {
   view.appendChild(head);
   if (!admin) {
     view.appendChild(el('div', { class: 'banner banner--info', style: { marginBottom: 'var(--gap)' } },
-      el('span', { text: '👁️ Read-only view — Graphic Artist ka. Advertiser lang ang pwedeng mag-edit ng products.' })));
+      el('span', { text: '👁️ Read-only view — you\'re a Graphic Artist. Only Advertisers can edit products.' })));
   }
 
   // ---- live-derived panels recompute from the draft ----
@@ -480,7 +480,7 @@ function sectionAI(draft) {
   );
 
   const body = el('div', { class: 'stack' },
-    el('div', { class: 'field__hint', text: 'Generate in Taglish (set language/backend in AI Settings). Outputs are editable before saving; copy appends with timestamps.' }),
+    el('div', { class: 'field__hint', text: 'Set the output language and backend in AI Settings. Outputs are editable before saving; copy appends with timestamps.' }),
     field('Product brief', briefTa, { full: true }), briefRow,
     field('Marketing angles', anglesEditor, { full: true }), anglesRow,
     el('div', {}, el('span', { class: 'field__label', text: 'Saved copy' }), copyCounts, el('div', { style: { marginTop: '8px' } }, copyRow)),

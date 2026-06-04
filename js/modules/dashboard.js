@@ -14,7 +14,7 @@ const MODULES = [
   { route: 'creatives', title: 'Creative Testing', desc: 'Brief, assign & rank image/video creatives.' },
   { route: 'daily', title: 'Daily Metrics', desc: 'Daily spend/revenue → ROAS, CPP, CPM, CTR & scale calls.' },
   { route: 'pages', title: 'Page Status', desc: 'Per-Facebook-Page performance & product mapping.' },
-  { route: 'content', title: 'AI Content', desc: 'Captions, hooks, headlines & scripts in Taglish.' },
+  { route: 'content', title: 'AI Content', desc: 'Captions, hooks, headlines & scripts in your chosen language.' },
   { route: 'competitors', title: 'Competitor Ads', desc: 'Track competitor ads & recreate / improve them.' },
   { route: 'experiments', title: 'A/B Tests', desc: 'Log tests, compare variants & let AI call the winner.' },
 ];
@@ -27,7 +27,7 @@ export function render(view) {
   const cfg = store.getConfig();
 
   view.appendChild(pageHeader(
-    'Today', `Mga dapat aksyunan ngayon · ${today}`,
+    'Today', `What to act on today · ${today}`,
     (products.length && isAdmin()) ? [button('+ New product', { variant: 'primary', onClick: () => { location.hash = '#/products'; } })] : [],
   ));
 
@@ -36,7 +36,7 @@ export function render(view) {
     view.appendChild(card('Get started',
       isAdmin()
         ? el('p', { class: 'muted', text: 'No data yet. Load a small sample dataset (2 products with creatives, daily metrics, pages & competitors) to explore every module, or jump straight into adding your first product.' })
-        : el('p', { class: 'muted', text: 'Wala pang data. Hintayin ang Advertiser na mag-set up — pagkatapos makikita mo dito ang mga creatives na assigned sa iyo.' }),
+        : el('p', { class: 'muted', text: 'No data yet. Wait for the Advertiser to set things up — then the creatives assigned to you will show up here.' }),
       isAdmin() ? el('div', { class: 'row', style: { marginTop: '8px' } },
         button('Load sample data', { variant: 'primary', onClick: () => loadSample(view) }),
         button('Start with a product', { variant: 'ghost', onClick: () => { location.hash = '#/products'; } }),
@@ -169,14 +169,14 @@ function renderReviewQueue() {
 
   const c = el('section', { class: 'card', style: { borderLeft: '3px solid var(--accent)' } });
   c.appendChild(el('h3', { class: 'card__title', text: `🎨 Creatives for review (${forReview.length})` }));
-  c.appendChild(el('p', { class: 'muted', style: { margin: '0 0 8px', fontSize: '12px' }, text: 'Mga bagong creative mula sa Graphic Artist. I-review, mag-set ng launch date, tapos Approve.' }));
+  c.appendChild(el('p', { class: 'muted', style: { margin: '0 0 8px', fontSize: '12px' }, text: 'New creatives from the Graphic Artist. Review them, set a launch date, then Approve.' }));
   const list = el('div', { class: 'stack', style: { gap: '8px' } });
   forReview.forEach((cr) => {
     const dateInput = el('input', { class: 'input', type: 'date', value: cr.launchDate || '', style: { width: 'auto' }, title: 'Launch date' });
-    const schedule = button('🗓️ Schedule', { variant: 'ghost', title: 'I-save ang launch date (mananatiling For Review)', onClick: () => {
-      if (!dateInput.value) { toast('Pumili muna ng petsa.', 'warn'); return; }
+    const schedule = button('🗓️ Schedule', { variant: 'ghost', title: 'Save the launch date (stays For Review)', onClick: () => {
+      if (!dateInput.value) { toast('Pick a date first.', 'warn'); return; }
       store.upsertCreative({ ...cr, launchDate: dateInput.value });
-      toast(`Naka-schedule: ${cr.title || 'creative'} → ${dateInput.value}`, 'success'); rerenderDash();
+      toast(`Scheduled: ${cr.title || 'creative'} → ${dateInput.value}`, 'success'); rerenderDash();
     } });
     const approve = button('✓ Approve', { variant: 'primary', onClick: () => {
       store.upsertCreative({ ...cr, status: 'Approved', launchDate: dateInput.value || cr.launchDate || '' });
@@ -200,12 +200,12 @@ function notifyNewReviews(cfg) {
   const seenAt = (cfg.ui && cfg.ui.reviewSeenAt) || '';
   const fresh = store.getCreatives().filter((c) => c.status === 'For Review' && (c.updatedAt || c.createdAt || '') > seenAt);
   if (!fresh.length) return;
-  toast(`🎨 ${fresh.length} bagong creative for review!`, 'info');
+  toast(`🎨 ${fresh.length} new creative(s) for review!`, 'info');
   try {
     if ('Notification' in window) {
-      const body = fresh.map((c) => c.title).filter(Boolean).slice(0, 3).join(', ') || 'Buksan ang dashboard para i-review.';
-      if (Notification.permission === 'granted') new Notification('Bagong creative for review', { body });
-      else if (Notification.permission !== 'denied') Notification.requestPermission().then((p) => { if (p === 'granted') new Notification('Bagong creative for review', { body }); });
+      const body = fresh.map((c) => c.title).filter(Boolean).slice(0, 3).join(', ') || 'Open the dashboard to review them.';
+      if (Notification.permission === 'granted') new Notification('New creative for review', { body });
+      else if (Notification.permission !== 'denied') Notification.requestPermission().then((p) => { if (p === 'granted') new Notification('New creative for review', { body }); });
     }
   } catch (e) { /* ignore */ }
   store.updateConfig({ ui: { reviewSeenAt: new Date().toISOString() } });
@@ -229,7 +229,7 @@ async function loadSample(view) {
     category: 'Supplements', status: 'Scaling',
     rnd: { source: '1688', supplier: 'Shenzhen Herba Co.', cost: 85, moq: 100, notes: 'Capsule form, 60ct bottle.', sampleStatus: 'Received' },
     score: { demand: 5, margin: 4, uniqueness: 3, problemSolving: 5, repeatPurchase: 4, total: 21 },
-    painPoints: ['Nakakalimot agad (forgetfulness)', 'Hindi makapag-focus sa trabaho', 'Brain fog tuwing hapon'],
+    painPoints: ['Forgets easily', "Can't focus at work", 'Afternoon brain fog'],
     offer: { mechanism: 'Ginkgo + Vitamin B complex', bundle: 'Buy 2 Take 1', guarantee: '30-day money back', bonus: 'Free ebook: Memory Hacks', urgency: 'Promo ends this week' },
     pricing: { srp: 499, cost: 85, shipping: 60, targetCpp: 250, breakevenRoas: 0, projectedMargin: 0 },
     approval: { decision: 'approved', decidedBy: 'You', decidedAt: today, reason: 'Strong demand + solid margin' },
@@ -243,7 +243,7 @@ async function loadSample(view) {
     category: 'Skincare', status: 'Pending',
     rnd: { source: 'Local distributor', supplier: 'Manila Beauty Supply', cost: 70, moq: 50, notes: 'Tube 30g.', sampleStatus: 'Ordered' },
     score: { demand: 4, margin: 4, uniqueness: 2, problemSolving: 4, repeatPurchase: 3, total: 17 },
-    painPoints: ['Pangit ang peklat (scars)', 'Hindi nawawala ang stretch marks'],
+    painPoints: ['Unsightly scars', "Stretch marks won't fade"],
     offer: { mechanism: 'Onion extract + Vitamin E', bundle: '', guarantee: 'Visible results in 4 weeks', bonus: '', urgency: '' },
     pricing: { srp: 349, cost: 70, shipping: 55, targetCpp: 180, breakevenRoas: 0, projectedMargin: 0 },
     approval: { decision: 'pending', decidedBy: '', decidedAt: '', reason: '' },
@@ -251,9 +251,9 @@ async function loadSample(view) {
   });
   store.upsertProduct(scar);
 
-  store.upsertCreative({ productCode: 'GINKGO-01', type: 'video', title: 'Lola testimonial UGC', hook: 'Nakakalimutan mo na ba ang mga pangalan?', script: 'Open on lola forgetting...', assignee: 'Unassigned', deadline: today, status: 'Winner', metrics: { spend: 4200, revenue: 14800, impressions: 120000, clicks: 2600, purchases: 41 } });
-  store.upsertCreative({ productCode: 'GINKGO-01', type: 'image', title: 'Before/After focus chart', hook: 'Brain fog? Subukan mo \'to.', script: '', assignee: 'Unassigned', deadline: today, status: 'Approved', metrics: { spend: 1800, revenue: 3900, impressions: 65000, clicks: 900, purchases: 11 } });
-  store.upsertCreative({ productCode: 'GINKGO-01', type: 'video', title: 'Doctor explainer', hook: 'Ito ang sinasabi ng mga doktor...', script: '', assignee: 'Unassigned', deadline: yday, status: 'In Progress', metrics: { spend: 0, revenue: 0, impressions: 0, clicks: 0, purchases: 0 } });
+  store.upsertCreative({ productCode: 'GINKGO-01', type: 'video', title: 'Grandma testimonial UGC', hook: 'Do you keep forgetting names?', script: 'Open on grandma forgetting...', assignee: 'Unassigned', deadline: today, status: 'Winner', metrics: { spend: 4200, revenue: 14800, impressions: 120000, clicks: 2600, purchases: 41 } });
+  store.upsertCreative({ productCode: 'GINKGO-01', type: 'image', title: 'Before/After focus chart', hook: 'Brain fog? Try this.', script: '', assignee: 'Unassigned', deadline: today, status: 'Approved', metrics: { spend: 1800, revenue: 3900, impressions: 65000, clicks: 900, purchases: 11 } });
+  store.upsertCreative({ productCode: 'GINKGO-01', type: 'video', title: 'Doctor explainer', hook: "Here's what doctors say...", script: '', assignee: 'Unassigned', deadline: yday, status: 'In Progress', metrics: { spend: 0, revenue: 0, impressions: 0, clicks: 0, purchases: 0 } });
 
   store.upsertDailyMetric({ productCode: 'GINKGO-01', date: today, spend: 6000, revenue: 18600, impressions: 185000, clicks: 3500, purchases: 52 });
   store.upsertDailyMetric({ productCode: 'GINKGO-01', date: yday, spend: 5200, revenue: 13520, impressions: 160000, clicks: 3000, purchases: 40 });
@@ -264,7 +264,7 @@ async function loadSample(view) {
   store.upsertPage({ name: 'Glow Skincare Store', productCode: '', pendingOrders: 3, pendingItems: 4, yesterdaySpend: 2200, status: 'Testing' });
 
   store.upsertCompetitor({ brand: 'NeuroMax', product: 'Memory pills', hook: 'Doctors are shocked!', creativeType: 'video', offer: 'Buy 1 Take 1', cta: 'Shop Now', visualStyle: 'Talking head + captions', screenshotUrl: '', recreateStatus: 'Not Started' });
-  store.upsertCompetitor({ brand: 'ClearSkin PH', product: 'Scar gel', hook: 'Goodbye peklat in 2 weeks', creativeType: 'image', offer: '50% OFF today', cta: 'Order Now', visualStyle: 'Before/after split', screenshotUrl: '', recreateStatus: 'Copied' });
+  store.upsertCompetitor({ brand: 'ClearSkin PH', product: 'Scar gel', hook: 'Goodbye scars in 2 weeks', creativeType: 'image', offer: '50% OFF today', cta: 'Order Now', visualStyle: 'Before/after split', screenshotUrl: '', recreateStatus: 'Copied' });
 
   toast('Sample data loaded.', 'success');
   if (window.STRATOS) window.STRATOS.refreshChrome();
