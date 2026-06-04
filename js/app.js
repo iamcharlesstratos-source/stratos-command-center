@@ -393,6 +393,47 @@ moreBtn.addEventListener('click', () => popoverMenu(moreBtn, [
 ]));
 _actions.appendChild(moreBtn);
 
+// ---------------------------------------------------------------------------
+// Identity + role (Advertiser / Graphic Artist)
+// ---------------------------------------------------------------------------
+function openIdentityModal() {
+  const ui = store.getConfig().ui || {};
+  const draft = { userName: ui.userName || '', role: ui.role || 'Advertiser' };
+  const nameInput = input({ value: draft.userName, placeholder: 'Pangalan mo (hal. Charles)' });
+  nameInput.addEventListener('input', (e) => { draft.userName = e.target.value; });
+  const roleSeg = segmented(['Advertiser', 'Graphic Artist'], draft.role, (v) => { draft.role = v; });
+  openModal({
+    title: 'Sino ka? (Role)', width: 480,
+    body: el('div', { class: 'stack' },
+      el('p', { class: 'field__hint', text: 'Para iangkop ang view sa trabaho mo. Naka-save lang ito sa browser na ito (per person).' }),
+      field('Pangalan', nameInput, { hint: 'Ginagamit din bilang "assignee" sa creatives.' }),
+      field('Role', roleSeg, { hint: 'Advertiser = buong command center. Graphic Artist = naka-focus sa creatives na naka-assign sa iyo.' }),
+    ),
+    actions: [
+      { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
+      { label: 'Save', variant: 'primary', onClick: (close) => {
+        const name = draft.userName.trim();
+        const cfg = store.getConfig();
+        const team = [...(cfg.team || [])];
+        if (name && !team.includes(name)) team.push(name);
+        store.updateConfig({ ui: { userName: name, role: draft.role }, team });
+        updateIdentityChip();
+        toast(`Role: ${draft.role}${name ? ' · ' + name : ''}`, 'success');
+        close(); renderRoute();
+      } },
+    ],
+  });
+}
+const ICON_USER = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+const identityBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnIdentity', title: 'Your role', onClick: openIdentityModal });
+function updateIdentityChip() {
+  const ui = store.getConfig().ui || {};
+  identityBtn.innerHTML = ICON_USER;
+  identityBtn.appendChild(el('span', { text: ui.userName ? `${ui.userName} · ${ui.role || 'Advertiser'}` : 'Set role', style: { marginLeft: '6px' } }));
+}
+_actions.insertBefore(identityBtn, _actions.firstChild);
+updateIdentityChip();
+
 // expose for modules that need to open settings (e.g. AI buttons before config)
 // and as a debugging affordance for this internal tool.
 window.STRATOS = { openAiSettings, openSyncSettings, openCommandPalette, applyUiPrefs, refreshChrome, renderRoute, store, metrics, ai, sync };
@@ -400,7 +441,10 @@ window.STRATOS = { openAiSettings, openSyncSettings, openCommandPalette, applyUi
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
-if (!location.hash) location.replace('#/dashboard');
+if (!location.hash) {
+  const role = (store.getConfig().ui || {}).role;
+  location.replace(role === 'Graphic Artist' ? '#/creatives' : '#/dashboard');
+}
 refreshChrome();
 renderRoute();
 sync.start(renderRoute); // no-op until Cloud Sync is configured & enabled

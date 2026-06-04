@@ -18,24 +18,31 @@ import { todayStr, toNum } from '../util.js';
 const STATUSES = ['To Do', 'In Progress', 'For Review', 'Approved', 'Launched', 'Winner', 'Loser'];
 const APPROVED_SET = ['Approved', 'Launched', 'Winner'];
 let viewMode = 'tables'; // 'tables' | 'board'
+let mineOnly = null;     // null = uninitialized; set from role on first render
+let mineOnlyRole = null; // re-init the filter when the role changes
 
 export function isOverdue(c) {
   return c.deadline && c.deadline < todayStr() && !APPROVED_SET.includes(c.status);
 }
 
 export function render(view) {
-  const creatives = store.getCreatives();
   const products = store.getProducts();
+  const ui = store.getConfig().ui || {};
+  const me = ui.userName || '';
+  if (mineOnly === null || mineOnlyRole !== ui.role) { mineOnly = !!me && ui.role === 'Graphic Artist'; mineOnlyRole = ui.role; } // artists default to their own work
+  const allCreatives = store.getCreatives();
+  const creatives = (mineOnly && me) ? allCreatives.filter((c) => c.assignee === me) : allCreatives;
 
   view.appendChild(pageHeader(
-    'Creative Testing Machine',
-    'Brief, assign, track & rank image/video creatives — fast.',
+    ui.role === 'Graphic Artist' ? 'My Creatives' : 'Creative Testing Machine',
+    ui.role === 'Graphic Artist' ? 'Mga creative na naka-assign sa iyo — briefs, deadlines & status.' : 'Brief, assign, track & rank image/video creatives — fast.',
     [
+      me ? button(mineOnly ? '◉ Mine only' : '○ All', { variant: 'ghost', title: 'Filter to creatives assigned to you', onClick: () => { mineOnly = !mineOnly; rerender(view); } }) : null,
       button(viewMode === 'tables' ? 'Board view' : 'Table view', { variant: 'ghost', onClick: () => { viewMode = viewMode === 'tables' ? 'board' : 'tables'; rerender(view); } }),
       button('Rank weights', { variant: 'ghost', onClick: () => openWeightsModal(view) }),
       button('Manage team', { variant: 'ghost', onClick: () => openTeamModal(view) }),
       button('+ New creative', { variant: 'primary', onClick: () => openCreativeModal(view) }),
-    ],
+    ].filter(Boolean),
   ));
 
   if (!products.length) {

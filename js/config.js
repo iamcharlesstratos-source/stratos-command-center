@@ -64,10 +64,12 @@ export const DEFAULT_CONFIG = {
     pollSeconds: 5,    // how often to pull teammates' changes
   },
 
-  // ---- UI preferences (theme + density) ----
+  // ---- UI preferences (theme + density) + who's using it (role) ----
   ui: {
     theme: 'dark',          // 'dark' | 'light'
     density: 'comfortable', // 'comfortable' | 'compact'
+    userName: '',           // this person's name (also used as creative assignee)
+    role: 'Advertiser',     // 'Advertiser' | 'Graphic Artist'
   },
 
   // ---- meta ----
