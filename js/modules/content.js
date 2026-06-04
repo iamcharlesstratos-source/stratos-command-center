@@ -31,8 +31,8 @@ const FRAMEWORKS = {
 const OUTPUT_TYPES = {
   hook: { bucket: 'hooks', label: 'scroll-stopping hooks', limit: 80 },
   caption: { bucket: 'captions', label: 'ad captions', limit: 150 },
-  headline: { bucket: 'headlines', label: 'headlines', limit: 40 },
-  'primary text': { bucket: 'primaryText', label: 'primary text variations', limit: 125 },
+  headline: { bucket: 'headlines', label: 'headlines', limit: 60, extra: 'Add one relevant emoji to each headline.' },
+  'primary text': { bucket: 'primaryText', label: 'primary text variations', limit: 320, extra: 'Each variation should be 3–5 sentences (hook → pain/benefit → soft CTA) with 3–6 relevant emojis sprinkled naturally. Keep each full variation on ONE line (no line breaks within a variation).' },
   CTA: { bucket: 'ctas', label: 'calls-to-action', limit: 25 },
   script: { bucket: 'scripts', label: 'short video scripts', limit: null },
   'objection-buster': { bucket: 'objections', label: 'objection-busting replies', limit: null },
@@ -146,7 +146,8 @@ function generate(view, outputType, count, bulk) {
   if (!product) { toast('Pick a product.', 'warn'); return; }
   const spec = OUTPUT_TYPES[outputType];
   const limitNote = spec.limit ? ` Keep each under ~${spec.limit} characters.` : '';
-  const user = `${ai.productContext(product)}\n\nWrite ${count} ${spec.label} for the platform above.${limitNote} One per line, no numbering.`;
+  const extraNote = spec.extra ? ' ' + spec.extra : '';
+  const user = `${ai.productContext(product)}\n\nWrite ${count} ${spec.label} for the platform above.${limitNote}${extraNote} One per line, no numbering.`;
 
   ai.openAiEditor({
     title: `Generate ${count} ${spec.label} — ${product.code}`,
@@ -166,7 +167,7 @@ function generateAdSet(view, count) {
   if (!ai.isConfigured()) { toast('Set up AI first (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
   const product = store.getProduct(state.code);
   if (!product) { toast('Pick a product.', 'warn'); return; }
-  const user = `${ai.productContext(product)}\n\nWrite ${count} complete Facebook ad-copy variations for this product. Each variation has:\n• Primary Text — a hook-first body, ~125 characters, conversational and emoji-light.\n• Headline — punchy, max ~40 characters.\n\nFormat EXACTLY like this and separate each variation with a line of three dashes:\nPrimary Text: <text>\nHeadline: <text>\n---\nPrimary Text: <text>\nHeadline: <text>\n\nNo numbering, no extra commentary.`;
+  const user = `${ai.productContext(product)}\n\nWrite ${count} complete Facebook ad-copy variations for this product. Each variation has:\n• Primary Text — 3 to 5 sentences (around 60–90 words): open with a scroll-stopping hook, agitate the pain or paint the dream benefit, add a line of proof/reassurance, then end with a clear call-to-action. Sprinkle 3–6 relevant emojis naturally (not on every line). Keep it as one paragraph.\n• Headline — punchy, max ~40 characters, WITH one relevant emoji.\n\nFormat EXACTLY like this and separate each variation with a line of three dashes:\nPrimary Text: <text>\nHeadline: <text>\n---\nPrimary Text: <text>\nHeadline: <text>\n\nNo numbering, no extra commentary.`;
 
   ai.openAiEditor({
     title: `Generate ${count} Facebook ad sets — ${product.code}`,
