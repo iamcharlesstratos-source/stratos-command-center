@@ -58,9 +58,11 @@ export const DEFAULT_CONFIG = {
   // ---- Cloud Sync (shared team data via Supabase REST; opt-in) ----
   // Only the DATA collections sync — config (incl. the AI key) stays local per user.
   sync: {
-    enabled: false,
-    url: '',           // e.g. https://xxxxxxxx.supabase.co
-    anonKey: '',       // Supabase anon/public key (RLS-guarded)
+    // Baked-in team workspace so no one has to type it. The anon key is a public,
+    // RLS-guarded client key (safe to ship) — NOT the service_role secret.
+    enabled: true,
+    url: 'https://bvgboiezlukrjrxrmvov.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z2JvaWV6bHVrcmpyeHJtdm92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzI5MzEsImV4cCI6MjA5NjA0ODkzMX0.XZHhmQaSQfD9rFNVRmSjltXcVK61-59W5t2KVKdHz1o',
     pollSeconds: 5,    // how often to pull teammates' changes
   },
 
