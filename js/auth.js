@@ -141,7 +141,7 @@ async function syncProfile() {
   if (prof.name) session.user.name = prof.name;
   if (prof.avatar) session.user.avatar = prof.avatar;
   save(session);
-  if (prof.email !== u.email) await putProfile({ id: u.id, email: u.email, name: prof.name || u.name, role: prof.role });
+  if (prof.email !== u.email) await putProfile({ id: u.id, email: u.email, name: prof.name || u.name, role });
 }
 
 /** Admin: list every team member. `select=*` so it works whether or not an

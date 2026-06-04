@@ -412,7 +412,7 @@ export function statTile(label, value, { sub, tone } = {}) {
  * Tiny inline SVG sparkline from a list of numbers (nulls are skipped/ignored).
  * opts: { width, height, color, fill }. Returns an <svg> element.
  */
-export function sparkline(values, { width = 84, height = 24, color = '#3B82F6', fill = true } = {}) {
+export function sparkline(values, { width = 84, height = 24, color = 'var(--accent)', fill = true } = {}) {
   const nums = values.map((v) => (Number.isFinite(v) ? v : null));
   const present = nums.filter((v) => v !== null);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

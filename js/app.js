@@ -621,7 +621,6 @@ function openUserManagement() {
     host.appendChild(list);
   }
 }
-const ICON_USER = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
 const identityBtn = el('button', { class: 'btn btn--ghost btn--sm', id: 'btnIdentity', title: 'Account', onClick: openIdentityModal });
 function updateIdentityChip() {
   const u = auth.current();
