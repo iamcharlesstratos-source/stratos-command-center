@@ -110,7 +110,7 @@ button { font-family: inherit; }
   overflow-y: auto;
 }
 .brand { display: flex; align-items: center; gap: 12px; padding: 6px 8px 18px; }
-.brand__logo { width: 40px; height: 40px; flex: 0 0 40px; }
+.brand__logo { width: 46px; height: 46px; flex: 0 0 46px; }
 .brand__name { font-size: 16px; font-weight: 750; letter-spacing: 0.02em; line-height: 1.1; }
 .brand__sub { font-size: 10px; color: var(--text-dim); letter-spacing: 0.16em; text-transform: uppercase; }
 .brand__accent { color: var(--brand-blue); }
