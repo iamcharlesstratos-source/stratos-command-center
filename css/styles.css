@@ -566,3 +566,7 @@ a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-ra
 .nav-team__manage { display: block; font-size: 11px; color: var(--accent); padding: 6px 8px 0; text-decoration: none; }
 .nav-team__manage:hover { text-decoration: underline; }
 @media (max-width: 720px) { .nav__team { display: none; } }
+
+/* avatars (account chip, account modal, team roster, edit profile) */
+.avatar { border-radius: 50%; object-fit: cover; overflow: hidden; flex: none; vertical-align: middle; display: inline-flex; align-items: center; justify-content: center; }
+.avatar--initials { background: var(--accent); color: #fff; font-weight: 700; line-height: 1; }

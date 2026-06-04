@@ -387,8 +387,80 @@ moreBtn.addEventListener('click', () => popoverMenu(moreBtn, [
 _actions.appendChild(moreBtn);
 
 // ---------------------------------------------------------------------------
-// Identity + role (Advertiser / Graphic Artist)
+// Identity + role (Advertiser / Graphic Artist) + avatar
 // ---------------------------------------------------------------------------
+function initials(name, email) {
+  const s = (name || (email || '').split('@')[0] || '?').trim();
+  const parts = s.split(/\s+/);
+  return (((parts[0] || '?')[0] || '?') + (parts[1] ? (parts[1][0] || '') : '')).toUpperCase();
+}
+/** A round avatar: the user's picture (data URL) or their initials. */
+function avatarNode(user, size = 28) {
+  const av = user && user.avatar;
+  if (av) return el('img', { src: av, alt: '', class: 'avatar', style: { width: size + 'px', height: size + 'px' } });
+  return el('span', { class: 'avatar avatar--initials', style: { width: size + 'px', height: size + 'px', fontSize: Math.round(size * 0.42) + 'px' }, text: initials(user && user.name, user && user.email) });
+}
+/** Read an image File → square 128px JPEG data URL via canvas. cb(null) on failure. */
+function fileToAvatar(file, cb) {
+  if (!file || !/^image\//.test(file.type)) { cb(null); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const S = 128, c = document.createElement('canvas'); c.width = S; c.height = S;
+        const ctx = c.getContext('2d');
+        const scale = Math.max(S / img.width, S / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+        cb(c.toDataURL('image/jpeg', 0.82));
+      } catch (e) { cb(null); }
+    };
+    img.onerror = () => cb(null);
+    img.src = reader.result;
+  };
+  reader.onerror = () => cb(null);
+  reader.readAsDataURL(file);
+}
+
+// Edit display name + profile picture.
+function openEditProfile() {
+  const u = auth.current() || {};
+  let avatar = u.avatar || (store.getConfig().ui || {}).avatar || '';
+  const nameInput = input({ value: u.name || '', placeholder: 'Display name' });
+  const preview = el('div', {});
+  const renderPreview = () => { clear(preview); preview.appendChild(avatarNode({ name: nameInput.value, email: u.email, avatar }, 72)); };
+  renderPreview();
+  nameInput.addEventListener('input', renderPreview);
+  const fileInput = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (f) fileToAvatar(f, (d) => { if (d) { avatar = d; renderPreview(); } else toast('Hindi mabasa ang larawan.', 'error'); });
+  });
+  const msg = el('div', { class: 'field__hint', style: { color: 'var(--bad)' } });
+  openModal({
+    title: 'Edit profile', width: 420,
+    body: el('div', { class: 'stack' },
+      el('div', { class: 'row', style: { gap: '14px', alignItems: 'center' } },
+        preview,
+        el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+          button('Upload picture', { variant: 'ghost', onClick: () => fileInput.click() }),
+          button('Remove', { variant: 'subtle', onClick: () => { avatar = ''; renderPreview(); } }))),
+      fileInput,
+      field('Display name', nameInput, { hint: 'Ginagamit din bilang assignee sa creatives.' }),
+      msg,
+    ),
+    actions: [
+      { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
+      { label: 'Save', variant: 'primary', onClick: async (close) => {
+        if (!nameInput.value.trim()) { msg.textContent = 'Kailangan ng display name.'; return; }
+        try { await auth.updateProfile({ name: nameInput.value, avatar }); updateIdentityChip(); renderTeamPanel(); toast('Profile updated.', 'success'); close(); }
+        catch (e) { msg.textContent = e.message; }
+      } },
+    ],
+  });
+}
+
 function openIdentityModal() {
   const u = auth.current();
   const admin = auth.isAdmin();
@@ -402,15 +474,19 @@ function openIdentityModal() {
   openModal({
     title: 'Account', width: 440,
     body: el('div', { class: 'stack' },
-      el('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } },
-        el('b', { text: u ? u.name : 'Guest', style: { fontSize: '16px' } }),
-        u ? el('span', { class: 'pill ' + (admin ? 'pill--good' : 'pill--neutral'), text: local ? u.role + ' (local)' : u.role }) : null,
+      el('div', { class: 'row', style: { gap: '12px', alignItems: 'center' } },
+        avatarNode(u || {}, 52),
+        el('div', { style: { minWidth: '0' } },
+          el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+            el('b', { text: u ? u.name : 'Guest', style: { fontSize: '16px' } }),
+            u ? el('span', { class: 'pill ' + (admin ? 'pill--good' : 'pill--neutral'), text: local ? u.role + ' (local)' : u.role }) : null),
+          u && u.email ? el('div', { class: 'field__hint', style: { margin: '2px 0 0' }, text: u.email }) : null),
       ),
-      u && u.email ? el('p', { class: 'field__hint', style: { margin: '0' }, text: u.email }) : null,
       el('p', { class: 'field__hint', text: roleLine }),
-      local ? null : el('div', { class: 'row', style: { gap: '8px', marginTop: '4px', flexWrap: 'wrap' } },
-        button('Change password', { variant: 'ghost', onClick: openChangePassword }),
-        admin ? button('Manage users', { variant: 'primary', onClick: openUserManagement }) : null,
+      el('div', { class: 'row', style: { gap: '8px', marginTop: '4px', flexWrap: 'wrap' } },
+        button('Edit profile', { variant: 'ghost', onClick: openEditProfile }),
+        local ? null : button('Change password', { variant: 'ghost', onClick: openChangePassword }),
+        (!local && admin) ? button('Manage users', { variant: 'primary', onClick: openUserManagement }) : null,
       ),
     ),
     actions: [
@@ -506,7 +582,9 @@ function updateIdentityChip() {
   const ui = store.getConfig().ui || {};
   const name = (u && u.name) || ui.userName || '';
   const r = (u && u.role) || ui.role || 'Advertiser';
-  identityBtn.innerHTML = ICON_USER;
+  const user = { name, email: u && u.email, avatar: (u && u.avatar) || ui.avatar || '' };
+  clear(identityBtn);
+  identityBtn.appendChild(avatarNode(user, 20));
   identityBtn.appendChild(el('span', { text: name ? `${name} · ${r}` : 'Account', style: { marginLeft: '6px' } }));
 }
 _actions.insertBefore(identityBtn, _actions.firstChild);
@@ -532,7 +610,7 @@ async function renderTeamPanel() {
     members.forEach((m) => {
       const mine = me && m.id === me.id;
       wrap.appendChild(el('div', { class: 'nav-team__member' + (mine ? ' is-me' : ''), title: m.email || '' },
-        el('span', { class: 'nav-team__dot' }),
+        avatarNode(m, 18),
         el('span', { class: 'nav-team__name', text: (m.name || (m.email || '').split('@')[0] || '—') + (mine ? ' (ikaw)' : '') })));
     });
     return wrap;

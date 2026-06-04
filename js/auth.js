@@ -32,7 +32,7 @@ function shape(data) {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: data.expires_at ? data.expires_at * 1000 : Date.now() + (data.expires_in || 3600) * 1000,
-    user: { id: u.id, email: u.email, role: meta.role === 'Graphic Artist' ? 'Graphic Artist' : 'Advertiser', name: meta.name || (u.email || '').split('@')[0] },
+    user: { id: u.id, email: u.email, role: meta.role === 'Graphic Artist' ? 'Graphic Artist' : 'Advertiser', name: meta.name || (u.email || '').split('@')[0], avatar: meta.avatar || '' },
   };
 }
 
@@ -139,15 +139,37 @@ async function syncProfile() {
   const role = prof.role === 'Advertiser' ? 'Advertiser' : 'Graphic Artist';
   session.user.role = role;
   if (prof.name) session.user.name = prof.name;
+  if (prof.avatar) session.user.avatar = prof.avatar;
   save(session);
   if (prof.email !== u.email) await putProfile({ id: u.id, email: u.email, name: prof.name || u.name, role: prof.role });
 }
 
-/** Admin: list every team member. Throws if the profiles table isn't set up. */
+/** Admin: list every team member. `select=*` so it works whether or not an
+ *  optional `avatar` column exists. Throws if the profiles table isn't set up. */
 export async function listUsers() {
-  const res = await fetch(rest() + '/stratos_profiles?select=id,email,name,role,updated_at&order=role.asc,email.asc', { headers: authedHeaders() });
+  const res = await fetch(rest() + '/stratos_profiles?select=*&order=role.asc,email.asc', { headers: authedHeaders() });
   if (!res.ok) throw new Error('Cannot load users (' + res.status + '). Make sure the stratos_profiles table + policies exist in Supabase.');
   return res.json();
+}
+
+/** Update the current user's display name + avatar (data URL). Reflected locally
+ *  immediately; best-effort to the profiles table (avatar needs an `avatar` column). */
+export async function updateProfile({ name, avatar } = {}) {
+  if (!isAuthed()) throw new Error('Not logged in.');
+  if (typeof name === 'string' && name.trim()) session.user.name = name.trim();
+  if (typeof avatar === 'string') session.user.avatar = avatar; // '' clears it
+  save(session);
+  try { store.updateConfig({ ui: { userName: session.user.name, avatar: session.user.avatar || '' } }); } catch (e) { /* ignore */ }
+  if (!session.local) {
+    await putProfile({ id: session.user.id, email: session.user.email, name: session.user.name, role: session.user.role });
+    try {
+      await fetch(rest() + '/stratos_profiles?id=eq.' + encodeURIComponent(session.user.id), {
+        method: 'PATCH', headers: authedHeaders({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ avatar: session.user.avatar || null }),
+      });
+    } catch (e) { /* avatar column may not exist — fine */ }
+  }
+  return current();
 }
 
 /** Admin: change a member's role (takes effect on their next login/refresh). */
