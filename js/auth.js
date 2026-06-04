@@ -42,7 +42,7 @@ export function token() { return session ? session.access_token : null; }
 async function call(path, body, extraHeaders) {
   let res;
   try { res = await fetch(base() + path, { method: 'POST', headers: headers(extraHeaders), body: JSON.stringify(body) }); }
-  catch (e) { throw new Error('Hindi maabot ang server. Check Supabase URL / internet. (' + e.message + ')'); }
+  catch (e) { throw new Error('Cannot reach the server. Check the Supabase URL / internet. (' + e.message + ')'); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.msg || data.error_description || data.error || `Failed (${res.status})`);
   return data;

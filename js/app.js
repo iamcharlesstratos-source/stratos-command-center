@@ -468,7 +468,7 @@ function showLogin() {
       brand.appendChild(orbitalMark(32, { spin: false }));
       brand.appendChild(el('div', { class: 'auth-brand__name', text: 'STRATOS' }));
       card.appendChild(brand);
-      card.appendChild(el('div', { class: 'auth-sub', text: mode === 'signin' ? 'Mag-log in sa Command Center' : 'Gumawa ng bagong account' }));
+      card.appendChild(el('div', { class: 'auth-sub', text: mode === 'signin' ? 'Log in to Marketing Command Center' : 'Create a new account' }));
 
       const msg = el('div', { class: 'auth-msg' });
       if (pendingMsg) { msg.classList.add(pendingMsg.kind === 'ok' ? 'auth-msg--ok' : 'auth-msg--bad'); msg.textContent = pendingMsg.text; pendingMsg = null; }
@@ -479,31 +479,31 @@ function showLogin() {
         const s = store.getConfig().sync || {};
         wsUrl = input({ value: s.url || '', placeholder: 'https://xxxx.supabase.co', autocomplete: 'off' });
         wsKey = input({ value: s.anonKey || '', placeholder: 'anon public key', type: 'password', autocomplete: 'off' });
-        card.appendChild(el('div', { class: 'auth-note', text: 'Una, ikonekta ang team workspace (Supabase → Settings → API).' }));
+        card.appendChild(el('div', { class: 'auth-note', text: 'First, connect the team workspace (Supabase → Settings → API).' }));
         card.appendChild(field('Workspace URL', wsUrl));
         card.appendChild(field('Workspace key (anon public)', wsKey));
       }
 
-      const nameInput = input({ placeholder: 'Pangalan (hal. Charles)', autocomplete: 'name' });
-      const emailInput = input({ type: 'email', placeholder: 'ikaw@email.com', autocomplete: 'username' });
+      const nameInput = input({ placeholder: 'Name (e.g. Charles)', autocomplete: 'name' });
+      const emailInput = input({ type: 'email', placeholder: 'you@email.com', autocomplete: 'username' });
       const pwInput = input({ type: 'password', placeholder: '••••••••', autocomplete: mode === 'signin' ? 'current-password' : 'new-password' });
       let roleSeg = null;
 
-      if (mode === 'signup') card.appendChild(field('Pangalan', nameInput));
+      if (mode === 'signup') card.appendChild(field('Name', nameInput));
       card.appendChild(field('Email', emailInput));
-      card.appendChild(field('Password', pwInput, mode === 'signup' ? { hint: 'Hindi bababa sa 6 na karakter.' } : undefined));
+      card.appendChild(field('Password', pwInput, mode === 'signup' ? { hint: 'At least 6 characters.' } : undefined));
       if (mode === 'signup') {
         roleSeg = segmented(['Advertiser', 'Graphic Artist'], 'Advertiser', () => {});
-        card.appendChild(field('Role', roleSeg, { hint: 'Advertiser = admin (buong access). Graphic Artist = view + sariling creatives lang.' }));
+        card.appendChild(field('Role', roleSeg, { hint: 'Advertiser = admin (full access). Graphic Artist = view + own creatives only.' }));
       }
 
       card.appendChild(msg);
-      const submit = button(mode === 'signin' ? 'Mag-log in' : 'Gumawa ng account', { variant: 'primary', full: true, onClick: doSubmit });
+      const submit = button(mode === 'signin' ? 'Log in' : 'Create account', { variant: 'primary', full: true, onClick: doSubmit });
       card.appendChild(submit);
 
       const switchRow = el('div', { class: 'auth-switch' },
-        el('span', { class: 'muted', text: mode === 'signin' ? 'Wala pang account? ' : 'May account na? ' }),
-        el('a', { href: '#', text: mode === 'signin' ? 'Mag-sign up' : 'Mag-log in' }),
+        el('span', { class: 'muted', text: mode === 'signin' ? "Don't have an account? " : 'Already have an account? ' }),
+        el('a', { href: '#', text: mode === 'signin' ? 'Sign up' : 'Log in' }),
       );
       switchRow.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); mode = mode === 'signin' ? 'signup' : 'signin'; render(); });
       card.appendChild(switchRow);
@@ -514,7 +514,7 @@ function showLogin() {
       function setBusy(b) {
         submit.disabled = b;
         const lbl = submit.querySelector('span:last-child');
-        if (lbl) lbl.textContent = b ? 'Sandali…' : (mode === 'signin' ? 'Mag-log in' : 'Gumawa ng account');
+        if (lbl) lbl.textContent = b ? 'Please wait…' : (mode === 'signin' ? 'Log in' : 'Create account');
       }
 
       async function doSubmit() {
@@ -524,13 +524,13 @@ function showLogin() {
         try {
           if (wsUrl && wsKey) {
             const url = wsUrl.value.trim(), key = wsKey.value.trim();
-            if (!url || !key) throw new Error('Kailangan ang Workspace URL at key.');
+            if (!url || !key) throw new Error('Workspace URL and key are required.');
             store.updateConfig({ sync: { url, anonKey: key, enabled: true } });
           }
-          if (!auth.isConfigured()) throw new Error('Kulang ang workspace settings (URL + key).');
+          if (!auth.isConfigured()) throw new Error('Workspace settings are incomplete (URL + key).');
           const email = emailInput.value.trim();
           const pw = pwInput.value;
-          if (!email || !pw) throw new Error('Email at password ang kailangan.');
+          if (!email || !pw) throw new Error('Email and password are required.');
           let user;
           if (mode === 'signup') {
             const activeBtn = roleSeg.querySelector('button.active');
@@ -543,7 +543,7 @@ function showLogin() {
           resolve(user);
         } catch (e) {
           if (e.message === 'CONFIRM_EMAIL') {
-            pendingMsg = { kind: 'ok', text: '✅ Account created! I-check ang email mo para i-confirm, tapos mag-log in.' };
+            pendingMsg = { kind: 'ok', text: '✅ Account created! Check your email to confirm, then log in.' };
             mode = 'signin';
             render();
           } else {
