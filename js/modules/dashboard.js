@@ -16,6 +16,7 @@ const MODULES = [
   { route: 'pages', title: 'Page Status', desc: 'Per-Facebook-Page performance & product mapping.' },
   { route: 'content', title: 'AI Content', desc: 'Captions, hooks, headlines & scripts in Taglish.' },
   { route: 'competitors', title: 'Competitor Ads', desc: 'Track competitor ads & recreate / improve them.' },
+  { route: 'experiments', title: 'A/B Tests', desc: 'Log tests, compare variants & let AI call the winner.' },
 ];
 
 export function render(view) {

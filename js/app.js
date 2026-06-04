@@ -18,9 +18,10 @@ import * as daily from './modules/daily.js';
 import * as pages from './modules/pages.js';
 import * as content from './modules/content.js';
 import * as competitors from './modules/competitors.js';
+import * as experiments from './modules/experiments.js';
 
 const ROUTES = {
-  dashboard, products, creatives, daily, pages, content, competitors,
+  dashboard, products, creatives, daily, pages, content, competitors, experiments,
 };
 const DEFAULT_ROUTE = 'dashboard';
 
@@ -71,6 +72,7 @@ function refreshChrome() {
     pages: s.pages,
     competitors: s.competitors,
     daily: store.getDailyMetrics().length,
+    experiments: store.getExperiments().length,
   };
   navEl.querySelectorAll('.nav__num').forEach((span) => {
     const key = span.dataset.count;
@@ -326,6 +328,7 @@ function buildCommands() {
     { icon: '📄', label: 'Page Status', run: go('#/pages') },
     { icon: '✨', label: 'AI Content', run: go('#/content') },
     { icon: '🔍', label: 'Competitor Ads', run: go('#/competitors') },
+    { icon: '🧪', label: 'A/B Tests & Experiments', run: go('#/experiments') },
     { icon: '＋', label: 'New product', hint: 'go to products', run: go('#/products') },
     { icon: '⬆', label: 'Export backup', run: () => document.getElementById('btnExport').click() },
     { icon: '⬇', label: 'Import backup', run: () => document.getElementById('btnImport').click() },

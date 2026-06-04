@@ -21,6 +21,7 @@ export const KEYS = {
   pages: `${NS}:pages`,
   competitors: `${NS}:competitors`,
   hooks: `${NS}:hooks`,        // Module 2 reusable hook bank
+  experiments: `${NS}:experiments`, // A/B tests / experiment log
   dailyReports: `${NS}:dailyReports`, // Module 3 AI daily reports, keyed by date
   config: `${NS}:config`,
 };
@@ -383,6 +384,47 @@ export function deleteHook(id) {
 }
 
 // ===========================================================================
+// EXPERIMENTS — A/B test & experiment log (keyed by `id`)
+// ===========================================================================
+
+/** A fresh experiment with two empty variants (A/B). */
+export function blankExperiment() {
+  return {
+    id: uid('ex'),
+    name: '',
+    productCode: '',
+    type: 'Creative',          // Creative | Audience | Offer | Price | Landing | Other
+    hypothesis: '',
+    status: 'Running',         // Planned | Running | Done
+    variants: [
+      { label: 'A', desc: '', spend: 0, revenue: 0, impressions: 0, clicks: 0, purchases: 0 },
+      { label: 'B', desc: '', spend: 0, revenue: 0, impressions: 0, clicks: 0, purchases: 0 },
+    ],
+    winner: '',                // '' | variant label
+    verdict: '',               // AI analysis text
+    notes: '',
+    createdAt: nowISO(),
+  };
+}
+
+export function getExperiments() {
+  return readCollection(KEYS.experiments);
+}
+export function getExperiment(id) {
+  return getExperiments().find((e) => e.id === id) || null;
+}
+export function upsertExperiment(exp) {
+  const e = { ...exp };
+  if (!e.id) e.id = uid('ex');
+  if (!e.createdAt) e.createdAt = nowISO();
+  e.updatedAt = nowISO();
+  return upsertInto(KEYS.experiments, e, 'id', 'experiments');
+}
+export function deleteExperiment(id) {
+  return deleteFrom(KEYS.experiments, id, 'id', 'experiments');
+}
+
+// ===========================================================================
 // DAILY REPORTS (Module 3 — AI-generated text keyed by date)
 // ===========================================================================
 
@@ -438,6 +480,7 @@ export function exportAll() {
       pages: getPages(),
       competitors: getCompetitors(),
       hooks: getHooks(),
+      experiments: getExperiments(),
       dailyReports: readRaw(KEYS.dailyReports, {}),
       config: readRaw(KEYS.config, {}), // store only the overrides, not merged defaults
     },
@@ -453,7 +496,7 @@ export function importAll(payload) {
     throw new Error('Invalid backup file: missing "data" object.');
   }
   const d = payload.data;
-  const collections = ['products', 'creatives', 'creativeMetrics', 'dailyMetrics', 'pages', 'competitors', 'hooks'];
+  const collections = ['products', 'creatives', 'creativeMetrics', 'dailyMetrics', 'pages', 'competitors', 'hooks', 'experiments'];
   for (const name of collections) {
     if (d[name] !== undefined && !Array.isArray(d[name])) {
       throw new Error(`Invalid backup: "${name}" must be an array.`);

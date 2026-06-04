@@ -130,10 +130,12 @@ function medal(rank) { return el('span', { text: rank === 1 ? '🥇' : rank === 
 function renderTable(view, type, list) {
   const title = type === 'image' ? 'Image Creatives' : 'Video Creatives';
   const columns = [
-    { key: 'title', label: 'Title', render: (c) => el('div', {},
-      el('span', { text: c.title || '(untitled)' }),
-      c.sourceCompetitorId ? el('span', { class: 'tag', style: { marginLeft: '6px' }, title: 'Duplicated from a competitor ad' }, '↻ competitor') : null,
-      el('div', { class: 'muted', style: { fontSize: '11px', marginTop: '2px' }, text: c.hook || '' })) },
+    { key: 'title', label: 'Title', render: (c) => el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+      c.imageUrl ? el('img', { src: c.imageUrl, alt: '', loading: 'lazy', style: { width: '34px', height: '34px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)', flex: 'none' } }) : null,
+      el('div', {},
+        el('span', { text: c.title || '(untitled)' }),
+        c.sourceCompetitorId ? el('span', { class: 'tag', style: { marginLeft: '6px' }, title: 'Duplicated from a competitor ad' }, '↻ competitor') : null,
+        el('div', { class: 'muted', style: { fontSize: '11px', marginTop: '2px' }, text: c.hook || '' }))) },
     { key: 'productCode', label: 'Product', render: (c) => el('span', { class: 'code-badge', text: c.productCode || '—' }) },
     { key: 'assignee', label: 'Assignee', render: (c) => c.assignee || '—' },
     { key: 'deadline', label: 'Deadline', sortValue: (c) => c.deadline || '', render: (c) => deadlineCell(c) },

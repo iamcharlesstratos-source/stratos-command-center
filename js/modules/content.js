@@ -49,6 +49,15 @@ const PLATFORM_NOTE = {
   Lazada: 'Platform: Lazada listing — benefit bullets, keywords, promo-driven.',
 };
 
+// Image-gen styles → descriptive cues appended to the prompt.
+const IMAGE_STYLES = {
+  'Studio product': 'professional studio product photography, clean seamless background, soft diffused lighting, sharp detail, commercial quality',
+  'UGC lifestyle': 'authentic user-generated content style, a real Filipino person holding/using the product, natural daylight, casual phone-photo look',
+  'Flat-lay': 'top-down flat-lay arrangement with tasteful props, bright and airy, minimal aesthetic',
+  'Home lifestyle': 'product in a cozy real-life Filipino home setting, warm relatable mood, lifestyle photography',
+  'Bold promo': 'bold promotional ad creative, vibrant high-contrast colors, strong central product, clean space for a text overlay',
+};
+
 const state = { code: '', platform: 'Facebook', tone: 'emotional', framework: 'None', output: 'caption', language: 'Taglish' };
 
 export function render(view) {
@@ -107,6 +116,8 @@ export function render(view) {
     el('div', { style: { marginTop: '10px' } }, quick),
     el('div', { class: 'field__label', style: { marginTop: '14px' } }, 'Facebook ad copy'),
     el('div', { style: { marginTop: '6px' } }, fbCopy),
+    el('div', { class: 'field__label', style: { marginTop: '14px' } }, 'Creative image'),
+    el('div', { style: { marginTop: '6px' } }, button('🎨 Generate ad image (AI)', { variant: 'primary', onClick: () => openImageGen(view) })),
   ));
 
   view.appendChild(renderSavedCopy(view));
@@ -235,6 +246,92 @@ function makeCreative(bucket, text) {
   });
   toast(`Creative created for ${product.code}. Opening Creative Machine…`, 'success');
   location.hash = '#/creatives';
+}
+
+// ---------------------------------------------------------------------------
+// Real AI image creative — free in-browser generation via Pollinations.ai
+// (just an <img> URL: no API key, renders on load). Save sticks the image URL
+// + prompt onto a new Creative.
+// ---------------------------------------------------------------------------
+function defaultImagePrompt(product, styleKey) {
+  return [product.name || product.code, product.category, IMAGE_STYLES[styleKey], 'advertising photo, no text, no watermark']
+    .filter(Boolean).join(', ');
+}
+
+function openImageGen(view) {
+  const product = store.getProduct(state.code);
+  if (!product) { toast('Pumili muna ng product.', 'warn'); return; }
+
+  let seed = Math.floor(Math.random() * 1e6);
+  let currentUrl = '';
+
+  const styleSel = select(Object.keys(IMAGE_STYLES), { value: 'Studio product' });
+  const ratioSel = select(['1:1 (feed)', '4:5 (feed)', '9:16 (story/reel)'], { value: '1:1 (feed)' });
+  const promptTa = textarea({ rows: 3, value: defaultImagePrompt(product, 'Studio product') });
+  const status = el('div', { class: 'field__hint' });
+  const imgWrap = el('div', { style: { marginTop: '10px' } });
+
+  styleSel.addEventListener('change', () => { promptTa.value = defaultImagePrompt(product, styleSel.value); });
+
+  function dims() {
+    const r = ratioSel.value;
+    if (r.startsWith('4:5')) return [896, 1120];
+    if (r.startsWith('9:16')) return [768, 1344];
+    return [1024, 1024];
+  }
+  function buildUrl() {
+    const [w, h] = dims();
+    const p = encodeURIComponent(promptTa.value.trim().slice(0, 800));
+    return `https://image.pollinations.ai/prompt/${p}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`;
+  }
+  function generate() {
+    if (!promptTa.value.trim()) { toast('Magsulat ng prompt.', 'warn'); return; }
+    currentUrl = buildUrl();
+    clear(imgWrap);
+    status.style.color = 'var(--text-dim)';
+    status.textContent = 'Gumagawa ng larawan… (mga 10–25 segundo)';
+    const img = el('img', { alt: 'AI ad creative', style: { width: '100%', maxWidth: '340px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'block' } });
+    img.addEventListener('load', () => { status.style.color = 'var(--good)'; status.textContent = '✅ Tapos. I-regenerate para sa ibang bersyon, o i-save.'; });
+    img.addEventListener('error', () => { status.style.color = 'var(--bad)'; status.textContent = 'Hindi ma-generate. Subukan ulit o palitan ang prompt.'; });
+    imgWrap.appendChild(img);
+    img.src = currentUrl;
+  }
+  function autoPrompt() {
+    if (!ai.isConfigured()) { toast('I-set up muna ang AI (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
+    const prev = promptTa.value;
+    promptTa.value = 'Writing prompt…';
+    ai.generate(
+      'You are an expert at writing prompts for an AI image generator. Output ONE single-line English image prompt only — no preamble, no quotes, no markdown.',
+      `${ai.productContext(product)}\n\nWrite an image-generation prompt for a "${styleSel.value}" style advertising photo of this product. Be specific about subject, setting, lighting, mood and colors. Under 60 words. End with: no text, no watermark.`,
+    ).then((t) => { promptTa.value = (t || '').trim().replace(/^["']|["']$/g, '') || prev; })
+     .catch((e) => { promptTa.value = prev; toast('AI prompt failed: ' + e.message, 'error'); });
+  }
+
+  const body = el('div', { class: 'stack' },
+    el('div', { class: 'form-grid' }, field('Style', styleSel), field('Ratio', ratioSel)),
+    field('Prompt', promptTa, { hint: 'Auto-filled mula sa product — pwede i-edit. English ang pinakaok para sa image AI.' }),
+    el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+      button('✨ Auto-write prompt', { variant: 'ghost', onClick: autoPrompt }),
+      button('🎨 Generate', { variant: 'primary', onClick: generate }),
+      button('🔁 Regenerate', { variant: 'ghost', onClick: () => { seed = Math.floor(Math.random() * 1e6); generate(); } }),
+    ),
+    status,
+    imgWrap,
+    el('p', { class: 'field__hint', text: 'Pang-concept / mockup / brief ito sa graphic artist — hindi pang-final na ad.' }),
+  );
+
+  openModal({
+    title: `AI ad image — ${product.code}`, width: 600, body,
+    actions: [
+      { label: 'Close', variant: 'ghost', onClick: (c) => c() },
+      { label: 'Open full', variant: 'ghost', onClick: () => { if (currentUrl) window.open(currentUrl, '_blank'); else toast('Generate muna.', 'warn'); } },
+      { label: 'Save as creative', variant: 'primary', onClick: (c) => {
+        if (!currentUrl) { toast('Generate muna ng image.', 'warn'); return; }
+        store.upsertCreative({ productCode: product.code, type: 'image', title: `AI image: ${promptTa.value.slice(0, 36)}…`, brief: promptTa.value, imageUrl: currentUrl, status: 'To Do' });
+        toast('Na-save sa Creatives (may image).', 'success'); c();
+      } },
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
