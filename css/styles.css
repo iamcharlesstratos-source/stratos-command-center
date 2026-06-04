@@ -120,7 +120,7 @@ button { font-family: inherit; }
 .brand-mark svg, .brand__logo { display: block; }
 .bm-stroke { stroke: var(--brand-ink); }
 .bm-fill { fill: var(--brand-blue); }
-.bm-center { stroke: var(--brand-ink); fill: none; }
+.bm-center { stroke: var(--brand-ink); fill: var(--surface); }   /* white hub on light, panel on dark */
 
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav__item {
