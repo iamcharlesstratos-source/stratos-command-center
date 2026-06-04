@@ -39,7 +39,7 @@ const OUTPUT_TYPES = {
   FAQ: { bucket: 'faqs', label: 'FAQ Q&A', limit: null },
   'chatbot reply': { bucket: 'chatbot', label: 'chatbot replies', limit: null },
 };
-const BUCKETS = ['hooks', 'captions', 'headlines', 'primaryText', 'ctas', 'scripts', 'objections', 'faqs', 'chatbot'];
+const BUCKETS = ['hooks', 'captions', 'headlines', 'primaryText', 'adSets', 'ctas', 'scripts', 'objections', 'faqs', 'chatbot'];
 function bucketLimit(bucket) { const e = Object.values(OUTPUT_TYPES).find((o) => o.bucket === bucket); return e ? e.limit : null; }
 
 const PLATFORM_NOTE = {
@@ -93,11 +93,20 @@ export function render(view) {
     button('5 objection-busters', { variant: 'ghost', onClick: () => generate(view, 'objection-buster', 5) }),
   );
 
+  // Facebook / Meta ad-copy fields — the two most-used + matched pairs.
+  const fbCopy = el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+    button('5 Primary Texts', { variant: 'ghost', onClick: () => generate(view, 'primary text', 5) }),
+    button('5 Headlines', { variant: 'ghost', onClick: () => generate(view, 'headline', 5) }),
+    button('📣 3 Full Ad Sets (Primary + Headline)', { variant: 'primary', onClick: () => generateAdSet(view, 3) }),
+  );
+
   view.appendChild(card('Generator',
     controls,
     el('hr', { class: 'divider' }),
     el('div', { class: 'spread' }, el('span', { class: 'field__label', text: 'Quick generate' }), el('div', { class: 'row', style: { gap: '8px' } }, complianceBtn, genBtn)),
     el('div', { style: { marginTop: '10px' } }, quick),
+    el('div', { class: 'field__label', style: { marginTop: '14px' } }, 'Facebook ad copy'),
+    el('div', { style: { marginTop: '6px' } }, fbCopy),
   ));
 
   view.appendChild(renderSavedCopy(view));
@@ -136,6 +145,27 @@ function generate(view, outputType, count, bulk) {
       const items = ai.parseList(text);
       store.appendProductCopy(product.code, spec.bucket, items, { platform: state.platform, tone: state.tone, lang: state.language, framework: state.framework });
       toast(`Appended ${items.length} → ${product.code}.copy.${spec.bucket}`, 'success');
+      rerender(view);
+    },
+  });
+}
+
+// Complete Facebook ad copy: matched Primary Text + Headline pairs (one full ad each).
+function generateAdSet(view, count) {
+  if (!ai.isConfigured()) { toast('Set up AI first (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
+  const product = store.getProduct(state.code);
+  if (!product) { toast('Pick a product.', 'warn'); return; }
+  const user = `${ai.productContext(product)}\n\nWrite ${count} complete Facebook ad-copy variations for this product. Each variation has:\n• Primary Text — a hook-first body, ~125 characters, conversational and emoji-light.\n• Headline — punchy, max ~40 characters.\n\nFormat EXACTLY like this and separate each variation with a line of three dashes:\nPrimary Text: <text>\nHeadline: <text>\n---\nPrimary Text: <text>\nHeadline: <text>\n\nNo numbering, no extra commentary.`;
+
+  ai.openAiEditor({
+    title: `Generate ${count} Facebook ad sets — ${product.code}`,
+    system: buildSystem(), user,
+    saveLabel: 'Append to adSets',
+    onSave: (text) => {
+      const sets = text.split(/^\s*-{3,}\s*$/m).map((s) => s.trim()).filter(Boolean);
+      const items = sets.length ? sets : [text.trim()];
+      store.appendProductCopy(product.code, 'adSets', items, { platform: state.platform, tone: state.tone, lang: state.language });
+      toast(`Appended ${items.length} ad set(s) → ${product.code}`, 'success');
       rerender(view);
     },
   });
@@ -240,7 +270,7 @@ function renderSavedCopy(view) {
         button('→', { variant: 'subtle', title: 'Make this a creative', onClick: () => makeCreative(b, txt) }),
         button('✕', { variant: 'subtle', title: 'Delete', onClick: () => { const p = store.getProduct(product.code); p.copy[b].splice(idx, 1); store.upsertProduct(p); rerender(view); } }));
       list.appendChild(el('div', { class: 'spread', style: { padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', alignItems: 'flex-start' } },
-        el('div', {}, el('div', { text: txt }), meta), actions));
+        el('div', {}, el('div', { text: txt, style: { whiteSpace: 'pre-wrap' } }), meta), actions));
     });
     c.appendChild(list);
   });
