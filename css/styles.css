@@ -149,6 +149,10 @@ button { font-family: inherit; }
   border-radius: var(--radius-pill); padding: 1px 7px; min-width: 22px; text-align: center;
 }
 .nav__num:empty { display: none; }
+.nav__section-label { font-size: 10px; text-transform: uppercase; letter-spacing: .16em; color: var(--text-dim); padding: 14px 12px 4px; }
+.nav__tool { font-weight: 500; }
+.nav__ext { margin-left: auto; font-size: 12px; color: var(--text-dim); opacity: .7; }
+.nav__tool:hover .nav__ext { opacity: 1; color: var(--accent); }
 .nav__spacer { flex: 1; }
 .nav__foot { font-size: 11px; color: var(--text-dim); padding: 10px 12px; border-top: 1px solid var(--border); }
 
