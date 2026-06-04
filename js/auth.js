@@ -6,12 +6,19 @@
 // user_metadata: 'Advertiser' = admin, 'Graphic Artist' = limited.
 
 import * as store from './store.js';
+import { DEFAULT_CONFIG } from './config.js';
 
 const SKEY = 'stratos:auth';
 let session = null;                 // { access_token, refresh_token, expires_at, user:{id,email,role,name} }
 const listeners = new Set();
 
-function creds() { const s = store.getConfig().sync || {}; return { url: (s.url || '').replace(/\/+$/, ''), anonKey: s.anonKey || '' }; }
+// Fall back to the baked-in workspace when a stored config has empty sync creds
+// (older stored configs persisted url:'' which would otherwise mask the default).
+function creds() {
+  const s = store.getConfig().sync || {};
+  const d = DEFAULT_CONFIG.sync || {};
+  return { url: (s.url || d.url || '').replace(/\/+$/, ''), anonKey: s.anonKey || d.anonKey || '' };
+}
 export function isConfigured() { const c = creds(); return !!(c.url && c.anonKey); }
 function base() { return creds().url + '/auth/v1'; }
 function rest() { return creds().url + '/rest/v1'; }

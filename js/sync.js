@@ -14,6 +14,7 @@
 
 import * as store from './store.js';
 import * as auth from './auth.js';
+import { DEFAULT_CONFIG } from './config.js';
 
 const state = { status: 'off', detail: '', timer: null, applying: false, lastBody: '', lastPulledAt: '' };
 let statusCb = null;
@@ -23,7 +24,17 @@ export function onStatus(fn) { statusCb = fn; fn && fn(getStatus()); }
 export function getStatus() { return { status: state.status, detail: state.detail }; }
 function setStatus(s, detail = '') { state.status = s; state.detail = detail; if (statusCb) statusCb(getStatus()); }
 
-function cfg() { return store.getConfig().sync || {}; }
+// Coalesce stored sync with the baked-in workspace default so an older stored
+// config (sync.url:'') doesn't mask the shipped workspace. With a workspace
+// present, sync is on unless the user explicitly disabled their OWN workspace.
+function cfg() {
+  const s = store.getConfig().sync || {};
+  const d = DEFAULT_CONFIG.sync || {};
+  const url = s.url || d.url || '';
+  const anonKey = s.anonKey || d.anonKey || '';
+  const enabled = !!(url && anonKey) && (s.url ? s.enabled !== false : true);
+  return { url, anonKey, enabled, pollSeconds: s.pollSeconds || d.pollSeconds || 5 };
+}
 export function isEnabled() { const c = cfg(); return !!(c.enabled && c.url && c.anonKey); }
 function endpoint() { return cfg().url.replace(/\/+$/, '') + '/rest/v1/stratos_kv'; }
 function headers(extra) {
