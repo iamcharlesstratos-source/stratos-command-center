@@ -37,10 +37,20 @@ function shape(data) {
 }
 
 export function current() { return session ? session.user : null; }
-export function isAuthed() { return !!(session && session.access_token); }
+export function isAuthed() { return !!(session && (session.access_token || session.local)); }
+export function isLocal() { return !!(session && session.local); }
 export function isAdmin() { return isAuthed() && session.user.role === 'Advertiser'; }
 export function role() { return session ? session.user.role : null; }
 export function token() { return session ? session.access_token : null; }
+export function hasStoredSession() { return !!localStorage.getItem(SKEY); }
+
+/** Escape hatch: sign in locally as admin on THIS device (no Supabase account).
+ *  Cloud Sync still works via the anon key, so shared team data still loads. */
+export function signInLocal(name = 'Admin') {
+  save({ access_token: null, refresh_token: null, expires_at: 0, local: true,
+    user: { id: 'local-admin', email: '', role: 'Advertiser', name: (name || 'Admin').trim() || 'Admin' } });
+  return current();
+}
 
 async function call(path, body, extraHeaders) {
   let res;
@@ -66,6 +76,7 @@ export async function signIn(email, password) {
 }
 
 export async function signOut() {
+  if (session && session.local) { save(null); return; }
   try { await fetch(base() + '/logout', { method: 'POST', headers: headers({ Authorization: 'Bearer ' + token() }) }); } catch { /* ignore */ }
   save(null);
 }
@@ -117,7 +128,7 @@ async function putProfile(row) {
 
 /** Reconcile the logged-in user with the profiles table (table role wins). */
 async function syncProfile() {
-  if (!session || !session.user || !session.user.id) return;
+  if (!session || session.local || !session.user || !session.user.id) return;
   const u = session.user;
   const prof = await fetchProfile(u.id);
   if (!prof) {
@@ -153,6 +164,7 @@ export async function setUserRole(id, role) {
 
 /** Change the current user's password (GoTrue). */
 export async function updatePassword(newPassword) {
+  if (isLocal()) throw new Error('Local mode — walang Supabase password. Mag-set up ng totoong account para magamit ito.');
   if (!isAuthed()) throw new Error('Not logged in.');
   let res;
   try {

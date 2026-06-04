@@ -400,20 +400,23 @@ _actions.appendChild(moreBtn);
 function openIdentityModal() {
   const u = auth.current();
   const admin = auth.isAdmin();
-  const roleLine = u
-    ? (admin ? '🛡️ Advertiser (admin) — full access sa lahat ng module at settings.'
-             : '🎨 Graphic Artist — view + i-update ang mga creatives na assigned sa iyo. Read-only ang iba.')
-    : 'Hindi naka-log in.';
+  const local = auth.isLocal();
+  const roleLine = local
+    ? '📴 Local mode — pumasok ka sa device na ito (walang Supabase account). Gumagana pa rin ang Cloud Sync.'
+    : u
+      ? (admin ? '🛡️ Advertiser (admin) — full access sa lahat ng module at settings.'
+               : '🎨 Graphic Artist — view + i-update ang mga creatives na assigned sa iyo. Read-only ang iba.')
+      : 'Hindi naka-log in.';
   openModal({
     title: 'Account', width: 440,
     body: el('div', { class: 'stack' },
       el('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } },
         el('b', { text: u ? u.name : 'Guest', style: { fontSize: '16px' } }),
-        u ? el('span', { class: 'pill ' + (admin ? 'pill--good' : 'pill--neutral'), text: u.role }) : null,
+        u ? el('span', { class: 'pill ' + (admin ? 'pill--good' : 'pill--neutral'), text: local ? u.role + ' (local)' : u.role }) : null,
       ),
       u && u.email ? el('p', { class: 'field__hint', style: { margin: '0' }, text: u.email }) : null,
       el('p', { class: 'field__hint', text: roleLine }),
-      el('div', { class: 'row', style: { gap: '8px', marginTop: '4px', flexWrap: 'wrap' } },
+      local ? null : el('div', { class: 'row', style: { gap: '8px', marginTop: '4px', flexWrap: 'wrap' } },
         button('Change password', { variant: 'ghost', onClick: openChangePassword }),
         admin ? button('Manage users', { variant: 'primary', onClick: openUserManagement }) : null,
       ),
@@ -591,6 +594,17 @@ function showLogin() {
       switchRow.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); mode = mode === 'signin' ? 'signup' : 'signin'; render(); });
       card.appendChild(switchRow);
 
+      // Escape hatch — get into the app on THIS device without a Supabase account.
+      const localRow = el('div', { class: 'auth-local' },
+        el('a', { href: '#', text: 'Hindi gumagana ang login? Pumasok sa device na ito →' }));
+      localRow.querySelector('a').addEventListener('click', (e) => {
+        e.preventDefault();
+        const user = auth.signInLocal((nameInput.value || '').trim() || 'Admin');
+        overlay.remove();
+        resolve(user);
+      });
+      card.appendChild(localRow);
+
       [nameInput, emailInput, pwInput].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSubmit(); } }));
       setTimeout(() => (mode === 'signup' ? nameInput : emailInput).focus(), 30);
 
@@ -648,7 +662,7 @@ function showLogin() {
 // ---------------------------------------------------------------------------
 (async () => {
   let user = null;
-  if (auth.isConfigured()) { try { user = await auth.init(); } catch (e) { /* expired / offline → fall through to login */ } }
+  if (auth.isConfigured() || auth.hasStoredSession()) { try { user = await auth.init(); } catch (e) { /* expired / offline → fall through to login */ } }
   if (!user) { try { user = await showLogin(); } catch (e) { /* user closed? keep gated */ } }
   if (user) store.updateConfig({ ui: { role: user.role, userName: user.name } });
 
