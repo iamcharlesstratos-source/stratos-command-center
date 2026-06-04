@@ -418,28 +418,8 @@ function matchProduct(token, products) {
   return '';
 }
 
-function parseImport(text, products) {
-  const lines = text.split(/\r?\n/).map((l) => l.replace(/\s+$/, '')).filter((l) => l.trim());
-  if (!lines.length) return { rows: [] };
-  const delim = lines[0].includes('\t') ? '\t' : ',';
-  const cells = lines.map((l) => l.split(delim).map((c) => c.trim().replace(/^"|"$/g, '')));
-  const hdrMap = mapHeader(cells[0]);
-  const hasHeader = Object.keys(hdrMap).length >= 2;
-  const map = hasHeader ? hdrMap : { product: 0, spend: 1, revenue: 2, impressions: 3, clicks: 4, purchases: 5 };
-  const dataRows = hasHeader ? cells.slice(1) : cells;
-  const get = (row, f) => (map[f] !== undefined ? row[map[f]] : '');
-  const rows = dataRows.map((row) => {
-    const token = (get(row, 'product') || '').toString();
-    return {
-      token,
-      productCode: matchProduct(token, products),
-      spend: parseMoney(get(row, 'spend')), revenue: parseMoney(get(row, 'revenue')),
-      impressions: parseMoney(get(row, 'impressions')), clicks: parseMoney(get(row, 'clicks')),
-      purchases: parseMoney(get(row, 'purchases')),
-    };
-  }).filter((r) => r.token);
-  return { rows, hasHeader };
-}
+const FIELD_LABELS = { product: 'Product / name', spend: 'Spend ₱', revenue: 'Revenue ₱', impressions: 'Impressions', clicks: 'Clicks', purchases: 'Purchases' };
+const IMPORT_FIELDS = Object.keys(FIELD_LABELS);
 
 function openImportModal(view) {
   const products = store.getProducts();
@@ -447,14 +427,70 @@ function openImportModal(view) {
   const codes = products.map((p) => p.code);
   const ta = textarea({ rows: 7, placeholder: 'GINKGO-01\t6000\t18600\t185000\t3500\t52\nSCAR-02\t2500\t4250\t90000\t1400\t14' });
   ta.style.fontFamily = 'var(--mono)'; ta.style.fontSize = '12px';
+  const mapHost = el('div', {});
   const previewHost = el('div', {});
-  let parsed = { rows: [] };
+
+  let cells = [];          // parsed 2D grid
+  let columnLabels = [];   // header names or "Column N"
+  let hasHeader = false;   // is the first row a header?
+  let headerOverride = null; // null = auto-detect, true/false = user choice
+  let mapping = {};        // field -> column index (or -1)
+  let rows = [];
+
+  function reparse() {
+    const lines = ta.value.split(/\r?\n/).map((l) => l.replace(/\s+$/, '')).filter((l) => l.trim());
+    cells = []; columnLabels = []; mapping = {};
+    if (lines.length) {
+      const delim = lines[0].includes('\t') ? '\t' : ',';
+      cells = lines.map((l) => l.split(delim).map((c) => c.trim().replace(/^"|"$/g, '')));
+      const hdrMap = mapHeader(cells[0]);
+      hasHeader = headerOverride === null ? (Object.keys(hdrMap).length >= 2) : headerOverride;
+      const ncols = Math.max(0, ...cells.map((r) => r.length));
+      for (let i = 0; i < ncols; i++) columnLabels.push(hasHeader ? (cells[0][i] || `Column ${i + 1}`) : `Column ${i + 1}`);
+      if (hasHeader) IMPORT_FIELDS.forEach((f) => { mapping[f] = hdrMap[f] !== undefined ? hdrMap[f] : -1; });
+      else IMPORT_FIELDS.forEach((f, i) => { mapping[f] = i < ncols ? i : -1; });
+    }
+    renderMapper();
+    computeRows();
+  }
+
+  function computeRows() {
+    const dataRows = hasHeader ? cells.slice(1) : cells;
+    const get = (row, f) => (mapping[f] >= 0 ? row[mapping[f]] : '');
+    rows = dataRows.map((row) => {
+      const token = (get(row, 'product') || '').toString();
+      return {
+        token, productCode: matchProduct(token, products),
+        spend: parseMoney(get(row, 'spend')), revenue: parseMoney(get(row, 'revenue')),
+        impressions: parseMoney(get(row, 'impressions')), clicks: parseMoney(get(row, 'clicks')),
+        purchases: parseMoney(get(row, 'purchases')),
+      };
+    }).filter((r) => r.token);
+    renderPreview();
+  }
+
+  function renderMapper() {
+    clear(mapHost);
+    if (!columnLabels.length) return;
+    const headerChk = el('input', { type: 'checkbox', style: { width: 'auto' } });
+    headerChk.checked = hasHeader;
+    headerChk.addEventListener('change', () => { headerOverride = headerChk.checked; reparse(); });
+    mapHost.appendChild(el('label', { class: 'row', style: { gap: '8px', alignItems: 'center', fontSize: '12px', marginBottom: '6px' } }, headerChk, el('span', { text: 'Unang row ay column names (header)' })));
+    mapHost.appendChild(el('div', { class: 'field__label', text: 'Itugma ang sarili mong columns:' }));
+    const grid = el('div', { class: 'form-grid' });
+    IMPORT_FIELDS.forEach((f) => {
+      const opts = [{ value: '-1', label: '— none —' }, ...columnLabels.map((l, i) => ({ value: String(i), label: `${i + 1}. ${l}` }))];
+      const sel = select(opts, { value: String(mapping[f] >= 0 ? mapping[f] : -1), onChange: (e) => { mapping[f] = parseInt(e.target.value, 10); computeRows(); } });
+      grid.appendChild(field(FIELD_LABELS[f], sel));
+    });
+    mapHost.appendChild(grid);
+  }
 
   function renderPreview() {
     clear(previewHost);
-    if (!parsed.rows.length) { previewHost.appendChild(el('p', { class: 'muted', style: { margin: 0 }, text: 'Paste rows, then Preview.' })); return; }
-    const matched = parsed.rows.filter((r) => r.productCode).length;
-    previewHost.appendChild(el('p', { class: 'field__hint', html: `Importing to <b>${selectedDate}</b> — <b>${matched}</b>/${parsed.rows.length} rows matched a product.` }));
+    if (!rows.length) { previewHost.appendChild(el('p', { class: 'muted', style: { margin: '8px 0 0' }, text: 'I-paste ang rows, tapos Preview.' })); return; }
+    const matched = rows.filter((r) => r.productCode).length;
+    previewHost.appendChild(el('p', { class: 'field__hint', html: `Importing to <b>${selectedDate}</b> — <b>${matched}</b>/${rows.length} rows matched a product.` }));
     const cols = [
       { key: 'token', label: 'Source', sortable: false, render: (r) => r.token },
       { key: 'productCode', label: '→ Product', sortable: false, render: (r) => {
@@ -468,17 +504,17 @@ function openImportModal(view) {
       { key: 'purchases', label: 'Purch', align: 'right', sortable: false, render: (r) => String(r.purchases) },
       { key: 'roas', label: 'ROAS', align: 'right', sortable: false, render: (r) => metrics.fmt(metrics.roas(r.revenue, r.spend), 'roas') },
     ];
-    previewHost.appendChild(sortableTable(cols, parsed.rows, { empty: 'No rows.' }));
+    previewHost.appendChild(sortableTable(cols, rows, { empty: 'No rows.' }));
   }
 
-  const doParse = () => { parsed = parseImport(ta.value, products); renderPreview(); };
-  ta.addEventListener('input', debounce(doParse, 350));
-  renderPreview();
+  ta.addEventListener('input', debounce(reparse, 350));
+  reparse();
 
   const body = el('div', { class: 'stack' },
-    el('p', { class: 'field__hint', html: `Paste from Ads Manager or a spreadsheet. A header row is auto-detected (aliases like "Amount spent", "Link clicks", "Results"); otherwise the order is <span class="mono">product, spend, revenue, impressions, clicks, purchases</span>. Tab- or comma-separated. Rows import to <b>${selectedDate}</b> (existing rows for that day are overwritten).` }),
+    el('p', { class: 'field__hint', html: `Paste mula sa Ads Manager o sarili mong spreadsheet (Excel/Sheets). Auto-detect ang header; kung iba ang columns mo, <b>i-map mo lang sa baba</b>. Tab- o comma-separated. Iimport sa <b>${selectedDate}</b> (oo-override ang existing rows ng araw na 'yon).` }),
     ta,
-    el('div', { class: 'row', style: { justifyContent: 'flex-end' } }, button('Preview', { variant: 'ghost', onClick: doParse })),
+    el('div', { class: 'row', style: { justifyContent: 'flex-end' } }, button('Preview / re-map', { variant: 'ghost', onClick: reparse })),
+    mapHost,
     previewHost,
   );
 
@@ -487,7 +523,7 @@ function openImportModal(view) {
     actions: [
       { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
       { label: 'Import matched', variant: 'primary', onClick: (close) => {
-        const matched = parsed.rows.filter((r) => r.productCode);
+        const matched = rows.filter((r) => r.productCode);
         if (!matched.length) { toast('No matched rows to import.', 'warn'); return; }
         matched.forEach((r) => store.upsertDailyMetric({ productCode: r.productCode, date: selectedDate, spend: r.spend, revenue: r.revenue, impressions: r.impressions, clicks: r.clicks, purchases: r.purchases }));
         metrics.recomputeAllStatuses();
