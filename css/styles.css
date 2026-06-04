@@ -31,6 +31,10 @@
   --warn:      #F5B945;
   --bad:       #F4506B;
 
+  /* brand logo (hub-and-spoke) — ink adapts to theme, blue stays */
+  --brand-ink:  #DCE4F2;   /* outlines (light on dark bg) */
+  --brand-blue: #3B82F6;   /* node fills */
+
   /* derived tints (status backgrounds) */
   --good-bg: rgba(45, 212, 167, 0.13);
   --warn-bg: rgba(245, 185, 69, 0.13);
@@ -107,8 +111,16 @@ button { font-family: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 12px; padding: 6px 8px 18px; }
 .brand__logo { width: 40px; height: 40px; flex: 0 0 40px; }
-.brand__name { font-size: 16px; font-weight: 750; letter-spacing: 0.04em; }
-.brand__sub { font-size: 10px; color: var(--text-dim); letter-spacing: 0.18em; text-transform: uppercase; }
+.brand__name { font-size: 16px; font-weight: 750; letter-spacing: 0.02em; line-height: 1.1; }
+.brand__sub { font-size: 10px; color: var(--text-dim); letter-spacing: 0.16em; text-transform: uppercase; }
+.brand__accent { color: var(--brand-blue); }
+
+/* hub-and-spoke logo mark — colors driven by theme vars so it works on any bg */
+.brand-mark { display: inline-flex; vertical-align: middle; }
+.brand-mark svg, .brand__logo { display: block; }
+.bm-stroke { stroke: var(--brand-ink); }
+.bm-fill { fill: var(--brand-blue); }
+.bm-center { stroke: var(--brand-ink); fill: none; }
 
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav__item {
@@ -462,6 +474,7 @@ body.density-compact .btn { padding: 6px 11px; }
   --text: #16203F;
   --text-dim: #5C6688;
   --good: #119C77; --warn: #B5810F; --bad: #D8364F;
+  --brand-ink: #0A1F44; --brand-blue: #1B6EF3;   /* navy + blue, like the logo on white */
   --good-bg: rgba(17, 156, 119, 0.12);
   --warn-bg: rgba(181, 129, 15, 0.12);
   --bad-bg: rgba(216, 54, 79, 0.12);
@@ -525,9 +538,9 @@ body.density-compact .btn { padding: 6px 11px; }
   padding: 28px 26px 24px;
   display: flex; flex-direction: column; gap: 12px;
 }
-.auth-brand { display: flex; align-items: center; gap: 10px; }
-.auth-brand .orbital-mark { width: 32px; height: 32px; flex: none; }
-.auth-brand__name { font-family: var(--font-display, inherit); font-weight: 700; font-size: 20px; letter-spacing: .14em; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
+.auth-brand .brand-mark { width: 42px; height: 42px; flex: none; }
+.auth-brand__name { font-family: var(--font-display, inherit); font-weight: 700; font-size: 19px; letter-spacing: .01em; line-height: 1.12; }
 .auth-sub { color: var(--text-dim); font-size: 13px; margin: -4px 0 6px; }
 .auth-note { font-size: 12px; color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
 .auth-card .field { display: flex; flex-direction: column; gap: 5px; }

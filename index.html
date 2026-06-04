@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>STRATOS — Marketing Command Center</title>
+  <title>Marketing Command Center</title>
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='10' fill='%238B5CF6'/%3E%3C/svg%3E" />
 </head>
@@ -13,22 +13,31 @@
     <aside class="sidebar">
       <div class="brand">
         <svg class="brand__logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <defs>
-            <linearGradient id="sGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#4F7BFF"/><stop offset="0.5" stop-color="#8B5CF6"/><stop offset="1" stop-color="#EC4899"/>
-            </linearGradient>
-          </defs>
-          <!-- orbital rings -->
-          <ellipse cx="24" cy="24" rx="21" ry="9" stroke="url(#sGrad)" stroke-width="1.5" opacity="0.55" transform="rotate(-28 24 24)"/>
-          <ellipse cx="24" cy="24" rx="21" ry="9" stroke="url(#sGrad)" stroke-width="1.5" opacity="0.35" transform="rotate(38 24 24)"/>
-          <!-- cosmic S -->
-          <path d="M31 16.5c-1.8-1.7-4.4-2.7-7-2.7-3.9 0-6.8 2.1-6.8 5.2 0 3 2.4 4.3 6.6 5.1 4.4.8 7.4 2.2 7.4 5.6 0 3.4-3.2 5.7-7.6 5.7-3 0-5.8-1.1-7.6-3"
-                stroke="url(#sGrad)" stroke-width="3.2" stroke-linecap="round" fill="none"/>
-          <circle cx="24" cy="24" r="2.4" fill="#EC4899"/>
+          <!-- spokes -->
+          <g class="bm-stroke" stroke-width="2.4" stroke-linecap="round">
+            <line x1="24" y1="24" x2="24" y2="10"/>
+            <line x1="24" y1="24" x2="36.1" y2="17"/>
+            <line x1="24" y1="24" x2="36.1" y2="31"/>
+            <line x1="24" y1="24" x2="24" y2="38"/>
+            <line x1="24" y1="24" x2="11.9" y2="31"/>
+            <line x1="24" y1="24" x2="11.9" y2="17"/>
+          </g>
+          <!-- outer nodes -->
+          <g class="bm-fill bm-stroke" stroke-width="2">
+            <circle cx="24" cy="10" r="4.2"/>
+            <circle cx="36.1" cy="17" r="4.2"/>
+            <circle cx="36.1" cy="31" r="4.2"/>
+            <circle cx="24" cy="38" r="4.2"/>
+            <circle cx="11.9" cy="31" r="4.2"/>
+            <circle cx="11.9" cy="17" r="4.2"/>
+          </g>
+          <!-- hub -->
+          <circle cx="24" cy="24" r="7.4" class="bm-center" stroke-width="2.4"/>
+          <circle cx="24" cy="24" r="3.6" class="bm-fill"/>
         </svg>
         <div>
-          <div class="brand__name">STRATOS</div>
-          <div class="brand__sub">Command Center</div>
+          <div class="brand__name">Marketing <span class="brand__accent">Command</span></div>
+          <div class="brand__sub">Center</div>
         </div>
       </div>
 

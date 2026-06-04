@@ -7,7 +7,7 @@ import * as metrics from './metrics.js';
 import * as ai from './ai.js';
 import * as sync from './sync.js';
 import * as auth from './auth.js';
-import { el, clear, button, openModal, confirmDialog, toast, field, input, select, pageHeader, popoverMenu, orbitalMark } from './ui.js';
+import { el, clear, button, openModal, confirmDialog, toast, field, input, select, pageHeader, popoverMenu, orbitalMark, brandMark } from './ui.js';
 import { todayStr } from './util.js';
 
 // Module views (each exports `render(view, params)`).
@@ -545,10 +545,13 @@ function showLogin() {
     function render() {
       clear(card);
       const brand = el('div', { class: 'auth-brand' });
-      brand.appendChild(orbitalMark(32, { spin: false }));
-      brand.appendChild(el('div', { class: 'auth-brand__name', text: 'STRATOS' }));
+      brand.appendChild(brandMark(44));
+      brand.appendChild(el('div', { class: 'auth-brand__name' },
+        el('div', { text: 'Marketing' }),
+        el('div', {}, el('span', { class: 'brand__accent', text: 'Command' }), document.createTextNode(' Center')),
+      ));
       card.appendChild(brand);
-      card.appendChild(el('div', { class: 'auth-sub', text: mode === 'signin' ? 'Log in to Marketing Command Center' : 'Create a new account' }));
+      card.appendChild(el('div', { class: 'auth-sub', text: mode === 'signin' ? 'Log in to continue' : 'Create a new account' }));
 
       const msg = el('div', { class: 'auth-msg' });
       if (pendingMsg) { msg.classList.add(pendingMsg.kind === 'ok' ? 'auth-msg--ok' : 'auth-msg--bad'); msg.textContent = pendingMsg.text; pendingMsg = null; }

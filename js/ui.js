@@ -357,6 +357,21 @@ export function orbitalMark(size = 48, { opacity = 1, spin = false } = {}) {
   return span;
 }
 
+/** The product logo: a hub-and-spoke mark. Colors come from theme vars (bm-* classes). */
+export function brandMark(size = 40) {
+  const nodes = [[24, 10], [36.1, 17], [36.1, 31], [24, 38], [11.9, 31], [11.9, 17]];
+  const spokes = nodes.map(([x, y]) => `<line x1="24" y1="24" x2="${x}" y2="${y}"/>`).join('');
+  const dots = nodes.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4.2"/>`).join('');
+  const span = el('span', { class: 'brand-mark', style: { width: size + 'px', height: size + 'px' } });
+  span.innerHTML = `<svg viewBox="0 0 48 48" width="${size}" height="${size}" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <g class="bm-stroke" stroke-width="2.4" stroke-linecap="round">${spokes}</g>
+    <g class="bm-fill bm-stroke" stroke-width="2">${dots}</g>
+    <circle cx="24" cy="24" r="7.4" class="bm-center" stroke-width="2.4"/>
+    <circle cx="24" cy="24" r="3.6" class="bm-fill"/>
+  </svg>`;
+  return span;
+}
+
 /** Shimmer skeleton placeholder (reduced-motion handled in CSS). */
 export function skeleton(lines = 3) {
   const w = el('div', { class: 'stack', style: { gap: '10px' } });
