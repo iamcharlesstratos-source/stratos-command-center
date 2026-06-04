@@ -216,6 +216,8 @@ function openAiSettings() {
       { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
       { label: 'Save settings', variant: 'primary', onClick: (close) => {
         store.updateConfig({ ai: { ...state } });
+        // Admins share the Groq key with the team via the workspace (auth-guarded row).
+        if (auth.isAdmin() && state.groqKey) { sync.pushAiSettings().then(() => toast('Groq key shared with the team.', 'info')).catch(() => {}); }
         toast('AI settings saved.', 'success');
         close();
       } },

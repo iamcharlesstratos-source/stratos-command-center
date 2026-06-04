@@ -56,10 +56,44 @@ export async function start(renderRouteFn) {
   setStatus('connecting');
   if (!start._subscribed) { store.subscribe(schedulePush); start._subscribed = true; } // once
   await pull(true);
+  await pullAiSettings();   // pick up the team's shared Groq key (if an admin set one)
   const secs = Math.max(3, Number(cfg().pollSeconds) || 5);
   state.timer = setInterval(() => pull(false), secs * 1000);
 }
 export function stop() { if (state.timer) { clearInterval(state.timer); state.timer = null; } }
+
+// ---------------------------------------------------------------------------
+// Shared AI key — an admin sets a free Groq key once; teammates auto-receive it.
+// Stored in a separate `stratos_ai` row (NOT in the data snapshot). The Groq key
+// is a secret, so the stratos_kv table MUST be RLS-restricted to authenticated.
+// ---------------------------------------------------------------------------
+export async function pushAiSettings() {
+  if (!isEnabled() || !auth.isAdmin()) return;
+  const a = store.getConfig().ai || {};
+  if (!a.groqKey) return;
+  try {
+    await fetch(endpoint(), {
+      method: 'POST', headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([{ key: 'stratos_ai', value: { groqKey: a.groqKey, groqModel: a.groqModel || '' }, updated_at: new Date().toISOString() }]),
+    });
+  } catch (e) { /* ignore */ }
+}
+export async function pullAiSettings() {
+  if (!isEnabled()) return;
+  try {
+    const res = await fetch(endpoint() + '?key=eq.stratos_ai&select=value', { headers: headers() });
+    if (!res.ok) return;
+    const rows = await res.json().catch(() => []);
+    const v = rows[0] && rows[0].value;
+    if (!v || !v.groqKey) return;
+    const cur = store.getConfig().ai || {};
+    if (cur.groqKey === v.groqKey && (!v.groqModel || cur.groqModel === v.groqModel)) return;
+    state.applying = true;
+    try {
+      store.updateConfig({ ai: { groqKey: v.groqKey, groqModel: v.groqModel || cur.groqModel, backend: (cur.backend === 'proxy' || cur.backend === 'direct') ? cur.backend : 'auto' } });
+    } finally { state.applying = false; }
+  } catch (e) { /* ignore */ }
+}
 
 let pushTimer = null;
 function schedulePush() {
