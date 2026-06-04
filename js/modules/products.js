@@ -36,7 +36,7 @@ function renderList(view) {
   const products = store.getProducts();
 
   view.appendChild(pageHeader(
-    'Product Testing Command Center',
+    'Stratos Products',
     'Every product runs through one pipeline — R&D → scoring → offer → pricing → launch.',
     isAdmin() ? [
       button('Auto-tag rules', { variant: 'ghost', onClick: openThresholdsModal }),

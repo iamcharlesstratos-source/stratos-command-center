@@ -314,7 +314,7 @@ function buildCommands() {
   const go = (hash) => () => { location.hash = hash; };
   const cmds = [
     { icon: '▦', label: 'Dashboard', run: go('#/dashboard') },
-    { icon: '📦', label: 'Product Testing', run: go('#/products') },
+    { icon: '📦', label: 'Stratos Products', run: go('#/products') },
     { icon: '🎬', label: 'Creative Testing', run: go('#/creatives') },
     { icon: '📊', label: 'Daily Metrics', run: go('#/daily') },
     { icon: '📄', label: 'Page Status', run: go('#/pages') },

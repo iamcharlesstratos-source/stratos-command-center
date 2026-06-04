@@ -10,7 +10,7 @@ import { todayStr, yesterdayStr } from '../util.js';
 const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
 
 const MODULES = [
-  { route: 'products', title: 'Product Testing', desc: 'R&D, scoring, offers, pricing & launch readiness — the hub.' },
+  { route: 'products', title: 'Stratos Products', desc: 'R&D, scoring, offers, pricing & launch readiness — the hub.' },
   { route: 'creatives', title: 'Creative Testing', desc: 'Brief, assign & rank image/video creatives.' },
   { route: 'daily', title: 'Daily Metrics', desc: 'Daily spend/revenue → ROAS, CPP, CPM, CTR & scale calls.' },
   { route: 'pages', title: 'Page Status', desc: 'Per-Facebook-Page performance & product mapping.' },
