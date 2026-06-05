@@ -599,7 +599,6 @@ function openUserManagement() {
     const list = el('div', { class: 'stack', style: { gap: '6px' } });
     if (!users.length) list.appendChild(el('p', { class: 'field__hint', text: 'No other users yet.' }));
     users.forEach((usr) => {
-      const isSelf = me && usr.id === me.id;
       const roleSel = select(auth.ROLES, {
         value: auth.ROLES.includes(usr.role) ? usr.role : 'Graphic Artist',
         onChange: async (e) => {
@@ -613,7 +612,7 @@ function openUserManagement() {
       roleSel.style.width = 'auto';
       const row = el('div', { class: 'spread', style: { padding: '9px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', gap: '12px' } },
         el('div', { style: { minWidth: '0' } },
-          el('div', { style: { fontWeight: '600' }, text: (usr.name || '(no name)') + (isSelf ? ' (you)' : '') }),
+          el('div', { style: { fontWeight: '600' }, text: usr.name || '(no name)' }),
           el('div', { class: 'field__hint', style: { margin: '0' }, text: usr.email || usr.id }),
         ),
         roleSel,
@@ -658,7 +657,7 @@ async function renderTeamPanel() {
       const mine = me && m.id === me.id;
       wrap.appendChild(el('div', { class: 'nav-team__member' + (mine ? ' is-me' : ''), title: m.email || '' },
         avatarNode(m, 18),
-        el('span', { class: 'nav-team__name', text: (m.name || (m.email || '').split('@')[0] || '—') + (mine ? ' (you)' : '') })));
+        el('span', { class: 'nav-team__name', text: (m.name || (m.email || '').split('@')[0] || '—') })));
     });
     return wrap;
   };
