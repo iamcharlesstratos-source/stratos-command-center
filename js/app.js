@@ -66,7 +66,9 @@ window.addEventListener('hashchange', renderRoute);
 // ---------------------------------------------------------------------------
 function refreshChrome() {
   const s = store.getSummary();
-  // nav counts
+  let alertCount = 0;
+  try { alertCount = metrics.computeAlerts().length; } catch (e) { /* ignore */ }
+  // nav counts (incl. an action-needed badge on Dashboard)
   const counts = {
     products: s.products,
     creatives: s.creatives,
@@ -74,6 +76,7 @@ function refreshChrome() {
     competitors: s.competitors,
     daily: store.getDailyMetrics().length,
     experiments: store.getExperiments().length,
+    alerts: alertCount,
   };
   navEl.querySelectorAll('.nav__num').forEach((span) => {
     const key = span.dataset.count;
@@ -90,8 +93,6 @@ function refreshChrome() {
     if (n > 0) host.appendChild(statusChip(n, label, tone));
   }
   // action-needed alerts chip (clickable → dashboard)
-  let alertCount = 0;
-  try { alertCount = metrics.computeAlerts().length; } catch { /* ignore */ }
   if (alertCount > 0) {
     host.appendChild(el('a', { href: '#/dashboard', class: 'chip', title: 'Action needed', style: { borderColor: 'var(--warn)', color: 'var(--warn)' } },
       document.createTextNode('⚠ '), el('b', { text: String(alertCount) }), document.createTextNode(' alerts')));
