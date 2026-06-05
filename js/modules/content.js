@@ -267,6 +267,9 @@ function makeCreative(bucket, text) {
 // (just an <img> URL: no API key, renders on load). Save sticks the image URL
 // + prompt onto a new Creative.
 // ---------------------------------------------------------------------------
+// Optional free Pollinations token (AI Settings) lifts the image rate limit.
+function imgTokenParam() { const t = (store.getConfig().ai || {}).imageToken; return t ? '&token=' + encodeURIComponent(t) : ''; }
+
 function defaultImagePrompt(product, styleKey) {
   return [product.name || product.code, product.category, IMAGE_STYLES[styleKey], 'advertising photo, no text, no watermark']
     .filter(Boolean).join(', ');
@@ -296,7 +299,7 @@ function openImageGen(view) {
   function buildUrl() {
     const [w, h] = dims();
     const p = encodeURIComponent(promptTa.value.trim().slice(0, 800));
-    return `https://image.pollinations.ai/prompt/${p}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`;
+    return `https://image.pollinations.ai/prompt/${p}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux${imgTokenParam()}`;
   }
   function generate() {
     if (!promptTa.value.trim()) { toast('Write a prompt.', 'warn'); return; }
@@ -373,7 +376,7 @@ function openImageAngles(view) {
   const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px', marginTop: '10px' } });
 
   function dims() { const r = ratioSel.value; if (r.startsWith('4:5')) return [768, 960]; if (r.startsWith('9:16')) return [720, 1280]; return [768, 768]; }
-  function urlFor(prompt, seed) { const [w, h] = dims(); return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 800))}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`; }
+  function urlFor(prompt, seed) { const [w, h] = dims(); return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 800))}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux${imgTokenParam()}`; }
 
   function makeTile(angle, idx) {
     const prompt = anglePrompt(product, angle.cue);

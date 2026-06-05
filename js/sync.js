@@ -70,11 +70,11 @@ export function stop() { if (state.timer) { clearInterval(state.timer); state.ti
 export async function pushAiSettings() {
   if (!isEnabled() || !auth.isAdmin()) return;
   const a = store.getConfig().ai || {};
-  if (!a.groqKey) return;
+  if (!a.groqKey && !a.imageToken) return;
   try {
     await fetch(endpoint(), {
       method: 'POST', headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify([{ key: 'stratos_ai', value: { groqKey: a.groqKey, groqModel: a.groqModel || '' }, updated_at: new Date().toISOString() }]),
+      body: JSON.stringify([{ key: 'stratos_ai', value: { groqKey: a.groqKey || '', groqModel: a.groqModel || '', imageToken: a.imageToken || '' }, updated_at: new Date().toISOString() }]),
     });
   } catch (e) { /* ignore */ }
 }
@@ -85,13 +85,15 @@ export async function pullAiSettings() {
     if (!res.ok) return;
     const rows = await res.json().catch(() => []);
     const v = rows[0] && rows[0].value;
-    if (!v || !v.groqKey) return;
+    if (!v || (!v.groqKey && !v.imageToken)) return;
     const cur = store.getConfig().ai || {};
-    if (cur.groqKey === v.groqKey && (!v.groqModel || cur.groqModel === v.groqModel)) return;
+    const patch = {};
+    if (v.groqKey && v.groqKey !== cur.groqKey) { patch.groqKey = v.groqKey; if (cur.backend !== 'proxy' && cur.backend !== 'direct') patch.backend = 'auto'; }
+    if (v.groqModel && v.groqModel !== cur.groqModel) patch.groqModel = v.groqModel;
+    if (v.imageToken && v.imageToken !== cur.imageToken) patch.imageToken = v.imageToken;
+    if (!Object.keys(patch).length) return;
     state.applying = true;
-    try {
-      store.updateConfig({ ai: { groqKey: v.groqKey, groqModel: v.groqModel || cur.groqModel, backend: (cur.backend === 'proxy' || cur.backend === 'direct') ? cur.backend : 'auto' } });
-    } finally { state.applying = false; }
+    try { store.updateConfig({ ai: patch }); } finally { state.applying = false; }
   } catch (e) { /* ignore */ }
 }
 

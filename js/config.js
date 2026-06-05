@@ -53,6 +53,7 @@ export const DEFAULT_CONFIG = {
     bulkModel: 'claude-haiku-4-5-20251001',   // cheaper Anthropic model for bulk hook generation
     maxTokens: 1024,
     language: 'Taglish',                      // default output language: Taglish | English | Tagalog
+    imageToken: '',                           // FREE Pollinations token (auth.pollinations.ai) — lifts the image rate limit
   },
 
   // ---- Cloud Sync (shared team data via Supabase REST; opt-in) ----

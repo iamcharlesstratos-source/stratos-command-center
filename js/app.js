@@ -183,6 +183,7 @@ function openAiSettings() {
   const copyModelInput = input({ value: ai.copyModel, onInput: (e) => state.copyModel = e.target.value });
   const bulkModelInput = input({ value: ai.bulkModel, onInput: (e) => state.bulkModel = e.target.value });
   const maxTokInput = input({ type: 'number', value: ai.maxTokens, onInput: (e) => state.maxTokens = parseInt(e.target.value, 10) || 1024 });
+  const imageTokenInput = input({ type: 'password', value: ai.imageToken || '', placeholder: 'Pollinations token (optional)', onInput: (e) => state.imageToken = e.target.value.trim() });
 
   const hint = el('p', { class: 'field__hint' });
   function renderHint() {
@@ -195,6 +196,7 @@ function openAiSettings() {
 
   const body = el('div', { class: 'stack' },
     field('🆓 Groq key (free — recommended)', groqKeyInput, { hint: 'Get one in 30s at console.groq.com/keys — works instantly, no terminal/proxy needed.' }),
+    field('🖼️ Image token (Pollinations, free)', imageTokenInput, { hint: 'For AI image generation. Free anonymous images are now rate-limited — get a free token at auth.pollinations.ai and paste it here to make images reliable. Admins share it with the team automatically.' }),
     field('Backend', backendSeg, { hint: 'How AI requests are sent. "auto" just uses your Groq key.' }),
     hint,
     field('Anthropic API key (direct mode)', keyInput, { hint: 'Optional. Stored client-side. Used only for Anthropic direct calls.' }),
@@ -217,8 +219,8 @@ function openAiSettings() {
       { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
       { label: 'Save settings', variant: 'primary', onClick: (close) => {
         store.updateConfig({ ai: { ...state } });
-        // Admins share the Groq key with the team via the workspace (auth-guarded row).
-        if (auth.isAdmin() && state.groqKey) { sync.pushAiSettings().then(() => toast('Groq key shared with the team.', 'info')).catch(() => {}); }
+        // Admins share the Groq key + image token with the team via the workspace.
+        if (auth.isAdmin() && (state.groqKey || state.imageToken)) { sync.pushAiSettings().then(() => toast('AI keys shared with the team.', 'info')).catch(() => {}); }
         toast('AI settings saved.', 'success');
         close();
       } },
