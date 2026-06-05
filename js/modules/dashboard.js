@@ -4,6 +4,7 @@
 
 import * as store from '../store.js';
 import * as metrics from '../metrics.js';
+import * as ai from '../ai.js';
 import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, lineChart, barChart, countUp } from '../ui.js';
 import { todayStr, yesterdayStr } from '../util.js';
 
@@ -64,6 +65,9 @@ export function render(view) {
     const queue = renderReviewQueue(view);
     if (queue) view.appendChild(queue);
   }
+
+  // ---- 1c) AI ACCOUNT AUDITOR (admin) ----
+  if (isAdmin()) view.appendChild(renderAuditor());
 
   // ---- 2) TODAY hero KPIs ----
   const dayRows = store.getDailyMetricsByDate(today);
@@ -209,6 +213,69 @@ function notifyNewReviews(cfg) {
     }
   } catch (e) { /* ignore */ }
   store.updateConfig({ ui: { reviewSeenAt: new Date().toISOString() } });
+}
+
+// ---------------------------------------------------------------------------
+// AI Account Auditor — reads the whole account and gives today's action list
+// ---------------------------------------------------------------------------
+function renderAuditor() {
+  const c = el('section', { class: 'card', style: { borderLeft: '3px solid var(--accent)' } });
+  c.appendChild(el('div', { class: 'spread' },
+    el('h3', { class: 'card__title', style: { margin: 0 }, text: '🧠 AI Account Auditor' }),
+    button("Run today's audit", { variant: 'primary', onClick: runAudit })));
+  c.appendChild(el('p', { class: 'field__hint', style: { margin: '8px 0 0' }, text: 'AI reviews your metrics, creatives & experiments, then tells you exactly what to scale, kill or fix today.' }));
+  return c;
+}
+
+function latestMetricFor(code) {
+  return store.getDailyMetricsByProduct(code).slice().sort((a, b) => (a.date < b.date ? 1 : -1))[0] || null;
+}
+
+function buildAuditContext() {
+  const cfg = store.getConfig();
+  const th = cfg.thresholds;
+  const today = todayStr();
+  const L = [];
+  L.push(`Date: ${today}`);
+  const tAgg = metrics.aggregate(store.getDailyMetricsByDate(today));
+  const yAgg = metrics.aggregate(store.getDailyMetricsByDate(yesterdayStr()));
+  L.push(`Account today: spend ${metrics.fmt(tAgg.spend, 'peso')}, revenue ${metrics.fmt(tAgg.revenue, 'peso')}, blended ROAS ${metrics.fmt(tAgg.roas, 'roas')}, ${tAgg.purchases} orders.`);
+  L.push(`Account yesterday: spend ${metrics.fmt(yAgg.spend, 'peso')}, revenue ${metrics.fmt(yAgg.revenue, 'peso')}, ROAS ${metrics.fmt(yAgg.roas, 'roas')}.`);
+  L.push(`Decision thresholds: Scale ROAS >= ${th.scaleRoas}, Observe ${th.observeRoas}-${th.scaleRoas}, Kill < ${th.observeRoas}.`);
+
+  L.push('\nPer product (latest day with data):');
+  store.getProducts().forEach((p) => {
+    const m = store.getDailyMetric(p.code, today) || latestMetricFor(p.code);
+    if (!m) { L.push(`- ${p.code} (${p.name}) [${p.status}]: NO metrics logged.`); return; }
+    const cm = metrics.computeMetrics(m);
+    const prof = metrics.profit(m, p);
+    const fat = metrics.detectFatigue(p.code);
+    L.push(`- ${p.code} (${p.name}) [${p.status}], ${m.date}: spend ${metrics.fmt(cm.spend, 'peso')}, rev ${metrics.fmt(cm.revenue, 'peso')}, ROAS ${metrics.fmt(cm.roas, 'roas')}, CPP ${metrics.fmt(cm.cpp, 'cpp')}, CTR ${metrics.fmt(cm.ctr, 'ctr')}, profit ${metrics.fmt(prof, 'peso')} (${metrics.profitLabel(prof, cm.spend) || '?'})${fat.fatiguing ? `, FATIGUING (${fat.reason})` : ''} -> ${metrics.labelForRoas(cm.roas, th) || 'n/a'}`);
+  });
+
+  const crs = store.getCreatives();
+  const odue = crs.filter((c) => c.deadline && c.deadline < today && !['Approved', 'Launched', 'Winner'].includes(c.status)).length;
+  L.push(`\nCreatives: ${crs.length} total, ${crs.filter((c) => c.status === 'Winner').length} winners, ${crs.filter((c) => c.status === 'For Review').length} for review, ${odue} overdue.`);
+
+  const exps = store.getExperiments();
+  L.push(`Experiments: ${exps.length} total, ${exps.filter((e) => e.status === 'Running').length} running, ${exps.filter((e) => e.winner).length} with a winner.`);
+
+  const alerts = metrics.computeAlerts();
+  if (alerts.length) L.push('\nSystem alerts: ' + alerts.map((a) => a.text).join('; ') + '.');
+  return L.join('\n');
+}
+
+function runAudit() {
+  if (!ai.isConfigured()) { toast('Set up AI first (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
+  if (!store.getProducts().length) { toast('Add products + log metrics first.', 'warn'); return; }
+  const today = todayStr();
+  ai.openAiEditor({
+    title: `AI Account Audit — ${today}`,
+    system: `${ai.languageDirective()} You are a senior Philippine performance-marketing strategist auditing a Facebook/TikTok COD e-commerce ad account. Be specific, decisive and prioritized, and use the account's own numbers.`,
+    user: `${buildAuditContext()}\n\nAudit this account and give me a PRIORITIZED action list for TODAY. For each item give: the product/area, the exact action (e.g. "scale +20%", "kill", "fix RTS", "ship 3 new hooks", "log metrics"), and a one-line reason from the data. Explicitly flag: products to SCALE, products to KILL, fatiguing creatives, missing data, and the single biggest opportunity. Keep it punchy — bullets, max ~10 items.`,
+    saveLabel: 'Save to daily report',
+    onSave: (text) => { const prev = store.getDailyReport(today); store.saveDailyReport(today, (prev ? prev + '\n\n' : '') + 'AUDIT:\n' + text); toast('Saved to daily report.', 'success'); },
+  });
 }
 
 // ---------------------------------------------------------------------------
