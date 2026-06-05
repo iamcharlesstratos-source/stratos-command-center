@@ -16,6 +16,7 @@ const MODULES = [
   { route: 'daily', title: 'Daily Metrics', desc: 'Daily spend/revenue → ROAS, CPP, CPM, CTR & scale calls.' },
   { route: 'pages', title: 'Page Status', desc: 'Per-Facebook-Page performance & product mapping.' },
   { route: 'content', title: 'AI Content', desc: 'Captions, hooks, headlines & scripts in your chosen language.' },
+  { route: 'research', title: 'Marketing Research', desc: 'Trending hooks, formats & angles + one-click to real ads.' },
   { route: 'competitors', title: 'Competitor Ads', desc: 'Track competitor ads & recreate / improve them.' },
   { route: 'experiments', title: 'A/B Tests', desc: 'Log tests, compare variants & let AI call the winner.' },
 ];
