@@ -58,6 +58,16 @@ const IMAGE_STYLES = {
   'Bold promo': 'bold promotional ad creative, vibrant high-contrast colors, strong central product, clean space for a text overlay',
 };
 
+// Marketing angles for the image "angle set" — each renders a distinct concept.
+const IMAGE_ANGLES = [
+  { label: 'Pain-point', cue: 'a frustrated, tired Filipino person struggling with the exact problem this product solves, relatable and emotional, soft natural light' },
+  { label: 'Benefit / result', cue: 'a happy confident Filipino person clearly enjoying the result of using the product, bright aspirational mood' },
+  { label: 'UGC testimonial', cue: 'authentic user-generated selfie-style photo, a real Filipino person holding the product, casual phone-camera look, natural daylight' },
+  { label: 'Before & after', cue: 'a clean side-by-side before-and-after comparison showing a clear transformation' },
+  { label: 'Bold promo', cue: 'bold high-contrast promotional ad creative, vibrant colors, the product as a big hero, clean empty space for a discount/text overlay' },
+  { label: 'Lifestyle', cue: 'the product placed in a cozy real Filipino home lifestyle scene, warm and relatable' },
+];
+
 const state = { code: '', platform: 'Facebook', tone: 'emotional', framework: 'None', output: 'caption', language: 'Taglish' };
 
 export function render(view) {
@@ -117,7 +127,10 @@ export function render(view) {
     el('div', { class: 'field__label', style: { marginTop: '14px' } }, 'Facebook ad copy'),
     el('div', { style: { marginTop: '6px' } }, fbCopy),
     el('div', { class: 'field__label', style: { marginTop: '14px' } }, 'Creative image'),
-    el('div', { style: { marginTop: '6px' } }, button('🎨 Generate ad image (AI)', { variant: 'primary', onClick: () => openImageGen(view) })),
+    el('div', { class: 'row', style: { marginTop: '6px', gap: '8px', flexWrap: 'wrap' } },
+      button('🎨 Single ad image', { variant: 'primary', onClick: () => openImageGen(view) }),
+      button('🖼️ Angle set (6 images)', { variant: 'ghost', onClick: () => openImageAngles(view) }),
+    ),
   ));
 
   view.appendChild(renderSavedCopy(view));
@@ -333,6 +346,63 @@ function openImageGen(view) {
       } },
     ],
   });
+}
+
+// Angle set — a gallery of image creatives across different marketing angles.
+function anglePrompt(product, cue) {
+  return [product.name || product.code, product.category, cue, 'professional advertising photo, high detail, no text, no watermark'].filter(Boolean).join(', ');
+}
+
+function openImageAngles(view) {
+  const product = store.getProduct(state.code);
+  if (!product) { toast('Pumili muna ng product.', 'warn'); return; }
+
+  let seedBase = Math.floor(Math.random() * 1e6);
+  const ratioSel = select(['1:1 (feed)', '4:5 (feed)', '9:16 (story/reel)'], { value: '1:1 (feed)', onChange: () => renderAll() });
+  const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginTop: '10px' } });
+
+  function dims() { const r = ratioSel.value; if (r.startsWith('4:5')) return [896, 1120]; if (r.startsWith('9:16')) return [768, 1344]; return [1024, 1024]; }
+  function urlFor(prompt, seed) { const [w, h] = dims(); return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 800))}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`; }
+
+  function renderTile(angle, idx) {
+    const prompt = anglePrompt(product, angle.cue);
+    let seed = seedBase + idx;
+    const tile = el('div', { class: 'card', style: { padding: '8px' } });
+    const imgHost = el('div', {});
+    const status = el('div', { class: 'field__hint', style: { margin: '4px 0 0' } });
+    function load() {
+      clear(imgHost);
+      status.style.color = 'var(--text-dim)'; status.textContent = 'Generating…';
+      const img = el('img', { alt: angle.label, style: { width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'block', aspectRatio: '1 / 1', objectFit: 'cover' } });
+      img.addEventListener('load', () => { status.textContent = ''; });
+      img.addEventListener('error', () => { status.style.color = 'var(--bad)'; status.textContent = 'Failed — regenerate.'; });
+      tile._url = urlFor(prompt, seed);
+      img.src = tile._url;
+      imgHost.appendChild(img);
+    }
+    load();
+    tile.appendChild(el('div', { style: { fontWeight: '600', fontSize: '12px', marginBottom: '6px' }, text: angle.label }));
+    tile.appendChild(imgHost);
+    tile.appendChild(status);
+    tile.appendChild(el('div', { class: 'row', style: { gap: '6px', marginTop: '6px', flexWrap: 'wrap' } },
+      button('🔁', { variant: 'subtle', title: 'Regenerate', onClick: () => { seed = Math.floor(Math.random() * 1e6); load(); } }),
+      button('↗', { variant: 'subtle', title: 'Open full', onClick: () => { if (tile._url) window.open(tile._url, '_blank'); } }),
+      button('Save', { variant: 'ghost', onClick: () => { if (!tile._url) return; store.upsertCreative({ productCode: product.code, type: 'image', title: `${angle.label}: ${product.code}`, brief: prompt, imageUrl: tile._url, status: 'To Do' }); toast(`Saved "${angle.label}" creative.`, 'success'); } }),
+    ));
+    return tile;
+  }
+  function renderAll() { clear(grid); IMAGE_ANGLES.forEach((a, i) => grid.appendChild(renderTile(a, i))); }
+  renderAll();
+
+  const body = el('div', { class: 'stack' },
+    el('div', { class: 'spread', style: { flexWrap: 'wrap', gap: '8px' } },
+      el('div', { style: { maxWidth: '180px' } }, field('Ratio', ratioSel)),
+      button('🔁 Regenerate all', { variant: 'ghost', onClick: () => { seedBase = Math.floor(Math.random() * 1e6); renderAll(); } }),
+    ),
+    grid,
+    el('p', { class: 'field__hint', text: 'Bawat tile = ibang angle (pain, benefit, UGC, before/after, promo, lifestyle). I-regenerate ang gusto mo, o i-Save ang magaganda bilang creatives. Concept/mockup lang ito.' }),
+  );
+  openModal({ title: `Image angles — ${product.code}`, width: 780, body, actions: [{ label: 'Close', variant: 'ghost', onClick: (c) => c() }] });
 }
 
 // ---------------------------------------------------------------------------
