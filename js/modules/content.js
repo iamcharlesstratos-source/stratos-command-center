@@ -301,14 +301,22 @@ function openImageGen(view) {
   function generate() {
     if (!promptTa.value.trim()) { toast('Write a prompt.', 'warn'); return; }
     currentUrl = buildUrl();
-    clear(imgWrap);
     status.style.color = 'var(--text-dim)';
     status.textContent = 'Generating image… (about 10–25 seconds)';
-    const img = el('img', { alt: 'AI ad creative', style: { width: '100%', maxWidth: '340px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'block' } });
-    img.addEventListener('load', () => { status.style.color = 'var(--good)'; status.textContent = '✅ Done. Regenerate for another version, or save.'; });
-    img.addEventListener('error', () => { status.style.color = 'var(--bad)'; status.textContent = 'Couldn\'t generate. Try again or change the prompt.'; });
-    imgWrap.appendChild(img);
-    img.src = currentUrl;
+    let tries = 0;
+    const attempt = () => {
+      clear(imgWrap);
+      const img = el('img', { alt: 'AI ad creative', style: { width: '100%', maxWidth: '340px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'block' } });
+      img.addEventListener('load', () => { status.style.color = 'var(--good)'; status.textContent = '✅ Done. Regenerate for another version, or save.'; });
+      img.addEventListener('error', () => {
+        tries += 1;
+        if (tries < 3) { status.style.color = 'var(--text-dim)'; status.textContent = `Image service busy — retrying (${tries})…`; setTimeout(attempt, 2500); }
+        else { status.style.color = 'var(--bad)'; status.textContent = 'Image service busy. Wait a few seconds and tap Regenerate.'; }
+      });
+      imgWrap.appendChild(img);
+      img.src = currentUrl;
+    };
+    attempt();
   }
   function autoPrompt() {
     if (!ai.isConfigured()) { toast('Set up AI first (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
@@ -355,52 +363,78 @@ function anglePrompt(product, cue) {
 
 function openImageAngles(view) {
   const product = store.getProduct(state.code);
-  if (!product) { toast('Pumili muna ng product.', 'warn'); return; }
+  if (!product) { toast('Pick a product first.', 'warn'); return; }
 
   let seedBase = Math.floor(Math.random() * 1e6);
-  const ratioSel = select(['1:1 (feed)', '4:5 (feed)', '9:16 (story/reel)'], { value: '1:1 (feed)', onChange: () => renderAll() });
-  const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginTop: '10px' } });
+  const tiles = [];
+  let running = false;
 
-  function dims() { const r = ratioSel.value; if (r.startsWith('4:5')) return [896, 1120]; if (r.startsWith('9:16')) return [768, 1344]; return [1024, 1024]; }
+  const ratioSel = select(['1:1 (feed)', '4:5 (feed)', '9:16 (story/reel)'], { value: '1:1 (feed)', onChange: () => startQueue() });
+  const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px', marginTop: '10px' } });
+
+  function dims() { const r = ratioSel.value; if (r.startsWith('4:5')) return [768, 960]; if (r.startsWith('9:16')) return [720, 1280]; return [768, 768]; }
   function urlFor(prompt, seed) { const [w, h] = dims(); return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 800))}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`; }
 
-  function renderTile(angle, idx) {
+  function makeTile(angle, idx) {
     const prompt = anglePrompt(product, angle.cue);
     let seed = seedBase + idx;
+    let tries = 0;
     const tile = el('div', { class: 'card', style: { padding: '8px' } });
     const imgHost = el('div', {});
     const status = el('div', { class: 'field__hint', style: { margin: '4px 0 0' } });
-    function load() {
+
+    function load(onSettled) {
       clear(imgHost);
-      status.style.color = 'var(--text-dim)'; status.textContent = 'Generating…';
+      status.style.color = 'var(--text-dim)'; status.textContent = tries ? `Retrying (${tries})…` : 'Generating…';
       const img = el('img', { alt: angle.label, style: { width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'block', aspectRatio: '1 / 1', objectFit: 'cover' } });
-      img.addEventListener('load', () => { status.textContent = ''; });
-      img.addEventListener('error', () => { status.style.color = 'var(--bad)'; status.textContent = 'Failed — regenerate.'; });
+      img.addEventListener('load', () => { status.textContent = ''; tries = 0; onSettled && onSettled(); });
+      img.addEventListener('error', () => {
+        tries += 1;
+        if (tries < 3) { setTimeout(() => load(onSettled), 2000); }
+        else { tries = 0; status.style.color = 'var(--bad)'; status.textContent = 'Busy — tap 🔁'; onSettled && onSettled(); }
+      });
       tile._url = urlFor(prompt, seed);
       img.src = tile._url;
       imgHost.appendChild(img);
     }
-    load();
+    function queued() { clear(imgHost); status.style.color = 'var(--text-dim)'; status.textContent = 'Queued…'; }
+    queued();
+
     tile.appendChild(el('div', { style: { fontWeight: '600', fontSize: '12px', marginBottom: '6px' }, text: angle.label }));
     tile.appendChild(imgHost);
     tile.appendChild(status);
     tile.appendChild(el('div', { class: 'row', style: { gap: '6px', marginTop: '6px', flexWrap: 'wrap' } },
-      button('🔁', { variant: 'subtle', title: 'Regenerate', onClick: () => { seed = Math.floor(Math.random() * 1e6); load(); } }),
+      button('🔁', { variant: 'subtle', title: 'Regenerate', onClick: () => { if (running) return; seed = Math.floor(Math.random() * 1e6); tries = 0; load(); } }),
       button('↗', { variant: 'subtle', title: 'Open full', onClick: () => { if (tile._url) window.open(tile._url, '_blank'); } }),
       button('Save', { variant: 'ghost', onClick: () => { if (!tile._url) return; store.upsertCreative({ productCode: product.code, type: 'image', title: `${angle.label}: ${product.code}`, brief: prompt, imageUrl: tile._url, status: 'To Do' }); toast(`Saved "${angle.label}" creative.`, 'success'); } }),
     ));
-    return tile;
+    return { tile, load, queued };
   }
-  function renderAll() { clear(grid); IMAGE_ANGLES.forEach((a, i) => grid.appendChild(renderTile(a, i))); }
-  renderAll();
+
+  function build() { clear(grid); tiles.length = 0; IMAGE_ANGLES.forEach((a, i) => { const t = makeTile(a, i); tiles.push(t); grid.appendChild(t.tile); }); }
+
+  function startQueue() {
+    if (running) return;
+    running = true;
+    tiles.forEach((t) => t.queued());
+    let i = 0;
+    const next = () => {
+      if (i >= tiles.length) { running = false; return; }
+      tiles[i++].load(() => setTimeout(next, 700)); // one at a time — free tier allows 1 concurrent request
+    };
+    next();
+  }
+
+  build();
+  startQueue();
 
   const body = el('div', { class: 'stack' },
     el('div', { class: 'spread', style: { flexWrap: 'wrap', gap: '8px' } },
       el('div', { style: { maxWidth: '180px' } }, field('Ratio', ratioSel)),
-      button('🔁 Regenerate all', { variant: 'ghost', onClick: () => { seedBase = Math.floor(Math.random() * 1e6); renderAll(); } }),
+      button('🔁 Regenerate all', { variant: 'ghost', onClick: () => { if (running) return; seedBase = Math.floor(Math.random() * 1e6); build(); startQueue(); } }),
     ),
     grid,
-    el('p', { class: 'field__hint', text: 'Bawat tile = ibang angle (pain, benefit, UGC, before/after, promo, lifestyle). I-regenerate ang gusto mo, o i-Save ang magaganda bilang creatives. Concept/mockup lang ito.' }),
+    el('p', { class: 'field__hint', text: 'Each tile = a different angle (pain, benefit, UGC, before/after, promo, lifestyle). Loads ONE AT A TIME (free image tier), so wait a bit. Regenerate any, or Save the good ones. Concept/mockup only.' }),
   );
   openModal({ title: `Image angles — ${product.code}`, width: 780, body, actions: [{ label: 'Close', variant: 'ghost', onClick: (c) => c() }] });
 }
