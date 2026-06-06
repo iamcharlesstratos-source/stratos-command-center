@@ -5,8 +5,8 @@
 import * as store from '../store.js';
 import * as metrics from '../metrics.js';
 import * as ai from '../ai.js';
-import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, field, input, select, lineChart, barChart, countUp } from '../ui.js';
-import { todayStr, yesterdayStr, toNum } from '../util.js';
+import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, field, input, select, lineChart, barChart, countUp, dateRangeControl } from '../ui.js';
+import { todayStr, yesterdayStr, toNum, resolveRange, inRange } from '../util.js';
 
 const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
 
@@ -30,10 +30,12 @@ export function render(view) {
   const yday = yesterdayStr();
   const cfg = store.getConfig();
 
-  view.appendChild(pageHeader(
-    'Today', `What to act on today · ${today}`,
-    (products.length && isAdmin()) ? [button('+ New product', { variant: 'primary', onClick: () => { location.hash = '#/products'; } })] : [],
-  ));
+  const range = store.getDateRange();
+  const rr = resolveRange(range);
+  const rangePicker = dateRangeControl({ value: range, onChange: (resolved, raw) => { store.setDateRange(raw); rerenderDash(); } });
+  const headerActions = [rangePicker];
+  if (products.length && isAdmin()) headerActions.push(button('+ New product', { variant: 'primary', onClick: () => { location.hash = '#/products'; } }));
+  view.appendChild(pageHeader('Today', `What to act on today · ${today}`, headerActions));
 
   // ---- empty state ----
   if (s.products === 0 && s.creatives === 0 && s.competitors === 0) {
@@ -51,6 +53,9 @@ export function render(view) {
 
   // ---- 0) WAR ROOM — today's direction (everyone sees it; admin sets it) ----
   view.appendChild(renderWarRoom());
+
+  // ---- 0.5) RANGE PERFORMANCE — date-range view on the main landing ----
+  view.appendChild(renderRangeCard(rr, cfg));
 
   // ---- 1) ACTION NEEDED (alerts first) ----
   const alerts = metrics.computeAlerts();
@@ -351,6 +356,61 @@ function renderWarRoom() {
     el('span', {}, el('b', { text: String(killed) }), document.createTextNode(' killed today')),
     el('span', {}, el('b', { style: { color: 'var(--good)' }, text: String(winners) }), document.createTextNode(' winners total')),
     el('a', { href: '#/creatives', class: 'btn btn--ghost btn--sm', text: '+ New creative' })));
+  return c;
+}
+
+// ---------------------------------------------------------------------------
+// Range performance — date-range view (the picker lives in the page header)
+// ---------------------------------------------------------------------------
+function dShiftD(dateStr, days) { const d = new Date(`${dateStr}T00:00:00`); d.setDate(d.getDate() + days); return todayStr(d); }
+function dDayCount(since, until) { return Math.round((new Date(`${until}T00:00:00`) - new Date(`${since}T00:00:00`)) / 86400000) + 1; }
+function dDelta(cur, prev) {
+  if (!Number.isFinite(prev) || prev === 0) return el('span', { class: 'muted', style: { fontSize: '11px' }, text: '—' });
+  const d = ((cur - prev) / Math.abs(prev)) * 100, up = d >= 0;
+  return el('span', { style: { fontSize: '11px', color: up ? 'var(--good)' : 'var(--bad)' }, text: `${up ? '▲' : '▼'} ${Math.abs(d).toFixed(0)}% vs prev` });
+}
+
+function renderRangeCard(rr, cfg) {
+  const all = store.getDailyMetrics();
+  const rows = all.filter((r) => inRange(r.date, rr));
+  const c = el('section', { class: 'card' });
+  c.appendChild(el('div', { class: 'spread', style: { alignItems: 'center', flexWrap: 'wrap', gap: '8px' } },
+    el('h3', { class: 'card__title', style: { margin: 0 }, text: `📅 Performance — ${rr.label}` }),
+    el('a', { href: '#/daily', class: 'field__hint', text: 'open Daily Metrics →' })));
+  if (!rows.length) { c.appendChild(el('p', { class: 'muted', style: { margin: '8px 0 0' }, text: 'No metrics logged in this range yet. Change the range up top, or log/sync metrics in Daily Metrics.' })); return c; }
+
+  const agg = metrics.aggregate(rows);
+  const profit = rows.reduce((s, r) => s + metrics.profit(r, store.getProduct(r.productCode)), 0);
+  let prev = null;
+  if (rr.since && rr.until && rr.until !== '9999-12-31') {
+    const n = dDayCount(rr.since, rr.until);
+    const pU = dShiftD(rr.since, -1), pS = dShiftD(pU, -(n - 1));
+    prev = metrics.aggregate(all.filter((r) => r.date >= pS && r.date <= pU));
+  }
+  const tone = (() => { const l = metrics.labelForRoas(agg.roas, cfg.thresholds); return l === 'Scale' ? 'good' : l === 'Observe' ? 'warn' : l === 'Kill' ? 'bad' : undefined; })();
+  const tile = (label, value, toneC, delta) => el('div', { class: `stat-tile${toneC ? ' stat-tile--' + toneC : ''}` },
+    el('div', { class: 'stat-tile__value', text: value }),
+    el('div', { class: 'stat-tile__label', text: label }),
+    delta ? el('div', { class: 'stat-tile__sub' }, delta) : null);
+  c.appendChild(el('div', { class: 'grid grid-4', style: { marginTop: '12px' } },
+    tile('Ad spend', metrics.fmt(agg.spend, 'peso'), undefined, prev ? dDelta(agg.spend, prev.spend) : null),
+    tile('Revenue', metrics.fmt(agg.revenue, 'peso'), agg.revenue >= agg.spend ? 'good' : 'bad', prev ? dDelta(agg.revenue, prev.revenue) : null),
+    tile('Blended ROAS', metrics.fmt(agg.roas, 'roas'), tone, prev ? dDelta(agg.roas || 0, prev.roas || 0) : null),
+    tile('Est. profit', metrics.fmt(profit, 'peso'), profit > 0 ? 'good' : profit < 0 ? 'bad' : 'warn', null)));
+
+  // top products by spend in the range
+  const byCode = {};
+  for (const r of rows) (byCode[r.productCode] = byCode[r.productCode] || []).push(r);
+  const top = Object.entries(byCode).map(([code, rs]) => { const a = metrics.aggregate(rs); return { code, spend: a.spend, roas: a.roas }; })
+    .sort((a, b) => b.spend - a.spend).slice(0, 5);
+  if (top.length) {
+    const list = el('div', { class: 'stack', style: { gap: '4px', marginTop: '12px' } },
+      el('div', { class: 'field__hint', text: 'Top products by spend' }));
+    top.forEach((t) => list.appendChild(el('a', { href: `#/products/${encodeURIComponent(t.code)}`, class: 'spread', style: { padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)' } },
+      el('span', { class: 'code-badge', text: t.code || '—' }),
+      el('span', { class: 'mono', text: `${metrics.fmt(t.spend, 'peso')} · ${metrics.fmt(t.roas, 'roas')}` }))));
+    c.appendChild(list);
+  }
   return c;
 }
 
