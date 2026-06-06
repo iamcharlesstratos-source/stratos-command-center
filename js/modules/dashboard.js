@@ -20,6 +20,7 @@ const MODULES = [
   { route: 'competitors', title: 'Competitor Ads', desc: 'Track competitor ads & recreate / improve them.' },
   { route: 'experiments', title: 'A/B Tests', desc: 'Log tests, compare variants & let AI call the winner.' },
   { route: 'diagnostics', title: 'Diagnostics', desc: 'Turns each product’s metrics into what’s wrong, why & the next move.' },
+  { route: 'scorecards', title: 'Team Scorecards', desc: 'Who shipped what — creatives, winners, win rate & output vs quota.' },
 ];
 
 export function render(view) {
