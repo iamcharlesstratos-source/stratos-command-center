@@ -17,6 +17,17 @@ import { todayStr, toNum } from '../util.js';
 
 const STATUSES = ['To Do', 'In Progress', 'For Review', 'Approved', 'Launched', 'Winner', 'Loser'];
 const APPROVED_SET = ['Approved', 'Launched', 'Winner'];
+// The angle a creative attacks the market from (shared with the War Room brief).
+export const ANGLES = ['Pain', 'Senior', 'Testimonial', 'Problem-Solution', 'Promo', 'Doctor', 'Lifestyle'];
+// The creative SOP skeleton every winning script/concept should answer, in order.
+const SOP_FIELDS = [
+  { key: 'problem', label: 'Problem', hint: 'the pain we agitate' },
+  { key: 'product', label: 'Product', hint: 'what it is / how it works' },
+  { key: 'benefit', label: 'Benefit', hint: 'the transformation' },
+  { key: 'offer', label: 'Offer', hint: 'bundle / price / guarantee' },
+  { key: 'cta', label: 'CTA', hint: 'the next action' },
+];
+const sopFilled = (e) => { const s = e.sop || {}; const has = (e.hook ? 1 : 0) + SOP_FIELDS.filter((f) => (s[f.key] || '').trim()).length; return { has, total: SOP_FIELDS.length + 1 }; };
 // Advertisers are admins; Graphic Artists can work creatives but not leaderboard/team settings.
 const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
 let viewMode = 'tables'; // 'tables' | 'board'
@@ -62,6 +73,9 @@ export function render(view) {
     statTile('Overdue', String(overdue), { tone: overdue ? 'bad' : undefined }),
   ));
 
+  // angle coverage matrix (which angles each product has tested / won)
+  view.appendChild(renderAngleMatrix(view));
+
   // leaderboard
   view.appendChild(renderLeaderboard(view, creatives));
 
@@ -77,6 +91,45 @@ export function render(view) {
 }
 
 function rerender(view) { clear(view); render(view); }
+
+// ---------------------------------------------------------------------------
+// Angle Matrix — products × angles, showing tested coverage & winners
+// ---------------------------------------------------------------------------
+function renderAngleMatrix(view) {
+  const all = store.getCreatives();
+  const products = store.getProducts().filter((p) => all.some((c) => c.productCode === p.code));
+  const c = el('section', { class: 'card' });
+  c.appendChild(el('div', { class: 'spread' },
+    el('h3', { class: 'card__title', style: { margin: 0 }, text: '🎯 Angle Matrix' }),
+    el('span', { class: 'field__hint', text: '⭐ has a winner · ● tested · gap = untested' })));
+  if (!products.length) { c.appendChild(el('p', { class: 'muted', style: { margin: '8px 0 0' }, text: 'No creatives yet — pick an angle when you create one and coverage shows up here.' })); return c; }
+
+  const cell = (style, kids) => el('td', { style: Object.assign({ padding: '7px 8px', textAlign: 'center', borderTop: '1px solid var(--border)', whiteSpace: 'nowrap' }, style || {}) }, kids);
+  const head = el('tr', {}, el('th', { style: { textAlign: 'left', padding: '6px 8px', position: 'sticky', left: 0, background: 'var(--surface)' }, text: 'Product' }),
+    ...ANGLES.map((a) => el('th', { style: { padding: '6px 8px', fontWeight: '600', fontSize: '12px' }, text: a })),
+    el('th', { style: { padding: '6px 8px', fontSize: '12px' }, text: 'Coverage' }));
+  const body = el('tbody', {});
+  for (const p of products) {
+    const mine = all.filter((x) => x.productCode === p.code);
+    let tested = 0;
+    const cells = ANGLES.map((a) => {
+      const list = mine.filter((x) => x.angle === a);
+      if (!list.length) return cell({ color: 'var(--text-dim)' }, document.createTextNode('·'));
+      tested++;
+      const win = list.some((x) => x.status === 'Winner');
+      return cell({ background: win ? 'var(--good-bg)' : 'var(--neutral-bg)', borderRadius: '4px' },
+        el('span', { style: { fontSize: '12px', fontWeight: '600', color: win ? 'var(--good)' : 'inherit' }, text: (win ? '⭐ ' : '') + list.length }));
+    });
+    const pctCov = Math.round((tested / ANGLES.length) * 100);
+    body.appendChild(el('tr', { style: { cursor: 'pointer' }, onClick: () => { location.hash = '#/products/' + encodeURIComponent(p.code); } },
+      el('td', { style: { textAlign: 'left', padding: '7px 8px', borderTop: '1px solid var(--border)', position: 'sticky', left: 0, background: 'var(--surface)' } }, el('span', { class: 'code-badge', text: p.code })),
+      ...cells,
+      cell({ borderTop: '1px solid var(--border)', fontSize: '12px', fontWeight: '600', color: pctCov >= 60 ? 'var(--good)' : pctCov >= 30 ? 'var(--warn)' : 'var(--bad)' }, document.createTextNode(pctCov + '%'))));
+  }
+  const table = el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' } }, el('thead', {}, head), body);
+  c.appendChild(el('div', { style: { overflowX: 'auto', marginTop: '10px' } }, table));
+  return c;
+}
 
 // ---------------------------------------------------------------------------
 // Leaderboard (composite ranking, editable weights)
@@ -134,6 +187,7 @@ function renderTable(view, type, list) {
       c.imageUrl ? el('img', { src: c.imageUrl, alt: '', loading: 'lazy', style: { width: '34px', height: '34px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)', flex: 'none' } }) : null,
       el('div', {},
         el('span', { text: c.title || '(untitled)' }),
+        c.angle ? el('span', { class: 'tag', style: { marginLeft: '6px' }, title: 'Angle' }, c.angle) : null,
         c.sourceCompetitorId ? el('span', { class: 'tag', style: { marginLeft: '6px' }, title: 'Duplicated from a competitor ad' }, '↻ competitor') : null,
         el('div', { class: 'muted', style: { fontSize: '11px', marginTop: '2px' }, text: c.hook || '' }))) },
     { key: 'productCode', label: 'Product', render: (c) => el('span', { class: 'code-badge', text: c.productCode || '—' }) },
@@ -252,7 +306,7 @@ function renderBoard(view, creatives) {
       const cardEl = el('div', { class: 'card', style: { padding: '10px', marginBottom: '8px', cursor: 'pointer', borderLeft: isOverdue(c) ? '3px solid var(--bad)' : '3px solid var(--border)' } });
       cardEl.addEventListener('click', () => openCreativeModal(view, store.getCreative(c.id)));
       cardEl.appendChild(el('div', { style: { fontWeight: '600', fontSize: '13px' }, text: c.title || '(untitled)' }));
-      cardEl.appendChild(el('div', { class: 'muted', style: { fontSize: '11px', marginTop: '4px' } }, el('span', { class: 'code-badge', text: c.productCode || '—' }), ' · ' + c.type));
+      cardEl.appendChild(el('div', { class: 'muted', style: { fontSize: '11px', marginTop: '4px' } }, el('span', { class: 'code-badge', text: c.productCode || '—' }), ' · ' + c.type, c.angle ? el('span', { class: 'tag', style: { marginLeft: '6px' } }, c.angle) : null));
       cardEl.appendChild(el('div', { class: 'muted', style: { fontSize: '11px', marginTop: '4px' }, text: (c.assignee || 'Unassigned') + (c.deadline ? ' · ' + c.deadline : '') }));
       col.appendChild(cardEl);
     });
@@ -274,7 +328,32 @@ function openCreativeModal(view, existing) {
   const typeSel = select([{ value: 'image', label: 'Image' }, { value: 'video', label: 'Video' }], { value: e.type || 'image' });
   const productSel = select(products.length ? products : [''], { value: e.productCode || products[0] || '' });
   const titleInput = input({ value: e.title || '', placeholder: 'Creative title' });
+  const angleSel = select(['', ...ANGLES].map((a) => ({ value: a, label: a || '— pick angle —' })), { value: e.angle || '' });
   const hookInput = input({ value: e.hook || '', placeholder: 'Hook / opening line' });
+
+  // Creative SOP skeleton (Hook is above; these are the rest of the framework).
+  const sop = e.sop || {};
+  const sopInputs = {};
+  const sopGrid = el('div', { class: 'form-grid' });
+  SOP_FIELDS.forEach((f) => { const inp = input({ value: sop[f.key] || '', placeholder: f.hint }); sopInputs[f.key] = inp; sopGrid.appendChild(field(f.label, inp)); });
+  const fillSop = button('✨ AI fill SOP', { variant: 'ghost', title: 'Generate Hook → Problem → Product → Benefit → Offer → CTA for the chosen angle', onClick: () => {
+    if (!ai.isConfigured()) { toast('Set up AI first (AI Settings).', 'warn'); window.STRATOS.openAiSettings(); return; }
+    const product = store.getProduct(productSel.value);
+    if (!product) { toast('Pick a product first.', 'warn'); return; }
+    ai.openAiEditor({
+      title: `Creative SOP — ${product.code}${angleSel.value ? ' · ' + angleSel.value : ''}`,
+      system: `${ai.languageDirective()} You build direct-response ad scripts using a fixed 6-part SOP. Be concrete and punchy.`,
+      user: `${ai.productContext(product)}\nAngle: ${angleSel.value || 'best fit for this product'}.\nCurrent hook: ${hookInput.value || '(none yet)'}\n\nWrite the 6-part creative SOP. Output EXACTLY these 6 labelled lines, nothing else, no markdown symbols:\nHOOK: ...\nPROBLEM: ...\nPRODUCT: ...\nBENEFIT: ...\nOFFER: ...\nCTA: ...`,
+      genOpts: { maxTokens: 700 },
+      saveLabel: 'Use SOP',
+      onSave: (text) => {
+        const pick = (lbl) => { const m = text.match(new RegExp('^\\s*' + lbl + '\\s*:\\s*(.+)$', 'im')); return m ? m[1].trim() : ''; };
+        const h = pick('HOOK'); if (h) hookInput.value = h;
+        SOP_FIELDS.forEach((f) => { const v = pick(f.label.toUpperCase()); if (v) sopInputs[f.key].value = v; });
+        toast('SOP filled — review & tweak.', 'success');
+      },
+    });
+  } });
   const scriptTa = textarea({ value: e.script || '', rows: 4, placeholder: 'Script (video) or image concept/prompt' });
   const assigneeSel = select(cfg.team.length ? cfg.team : ['Unassigned'], { value: e.assignee || cfg.team[0] || 'Unassigned' });
   const deadlineInput = input({ type: 'date', value: e.deadline || '' });
@@ -314,9 +393,12 @@ function openCreativeModal(view, existing) {
   const body = el('div', { class: 'stack' },
     el('div', { class: 'form-grid' },
       field('Type', typeSel), field('Product', productSel),
-      field('Title', titleInput, { full: true }),
+      field('Angle', angleSel), field('Title', titleInput),
       field('Hook', hookInput, { full: true }),
     ),
+    el('div', { class: 'spread', style: { marginTop: '4px' } },
+      el('span', { class: 'field__label', text: 'Creative SOP (script skeleton)' }), fillSop),
+    sopGrid,
     field('Script / concept', scriptTa, { full: true }),
     aiRow,
     el('div', { class: 'form-grid' },
@@ -341,7 +423,9 @@ function openCreativeModal(view, existing) {
         const saved = store.upsertCreative({
           ...(existing || {}),
           type: typeSel.value, productCode: productSel.value, title: titleInput.value.trim(),
-          hook: hookInput.value.trim(), script: scriptTa.value, assignee: assigneeSel.value,
+          angle: angleSel.value, hook: hookInput.value.trim(),
+          sop: Object.fromEntries(SOP_FIELDS.map((f) => [f.key, sopInputs[f.key].value.trim()])),
+          script: scriptTa.value, assignee: assigneeSel.value,
           deadline: deadlineInput.value, launchDate: launchInput.value, status: statusSel.value,
           metrics: Object.fromEntries(Object.entries(metricInputs).map(([k, v]) => [k, toNum(v.value)])),
         });
