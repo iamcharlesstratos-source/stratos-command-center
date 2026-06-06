@@ -19,6 +19,7 @@ const MODULES = [
   { route: 'research', title: 'Marketing Research', desc: 'Trending hooks, formats & angles + one-click to real ads.' },
   { route: 'competitors', title: 'Competitor Ads', desc: 'Track competitor ads & recreate / improve them.' },
   { route: 'experiments', title: 'A/B Tests', desc: 'Log tests, compare variants & let AI call the winner.' },
+  { route: 'diagnostics', title: 'Diagnostics', desc: 'Turns each product’s metrics into what’s wrong, why & the next move.' },
 ];
 
 export function render(view) {

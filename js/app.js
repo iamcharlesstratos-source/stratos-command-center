@@ -20,9 +20,10 @@ import * as content from './modules/content.js';
 import * as competitors from './modules/competitors.js';
 import * as experiments from './modules/experiments.js';
 import * as research from './modules/research.js';
+import * as diagnostics from './modules/diagnostics.js';
 
 const ROUTES = {
-  dashboard, products, creatives, daily, pages, content, competitors, experiments, research,
+  dashboard, products, creatives, daily, pages, content, competitors, experiments, research, diagnostics,
 };
 const DEFAULT_ROUTE = 'dashboard';
 
@@ -326,6 +327,7 @@ function buildCommands() {
     { icon: '🔎', label: 'Marketing Research', run: go('#/research') },
     { icon: '🔍', label: 'Competitor Ads', run: go('#/competitors') },
     { icon: '🧪', label: 'A/B Tests & Experiments', run: go('#/experiments') },
+    { icon: '🩺', label: 'Diagnostics', run: go('#/diagnostics') },
     { icon: '＋', label: 'New product', hint: 'go to products', run: go('#/products') },
     { icon: '⬆', label: 'Export backup', run: () => document.getElementById('btnExport').click() },
     { icon: '⬇', label: 'Import backup', run: () => document.getElementById('btnImport').click() },
