@@ -204,7 +204,9 @@ export function parseList(text) {
  *   asList      if true, show a hint that lines become list items
  */
 export function openAiEditor(opts) {
-  const ta = textarea({ rows: 12, value: '', placeholder: 'Generating…' });
+  const ta = textarea({ rows: 14, value: '', placeholder: 'Generating…' });
+  ta.spellcheck = false;                 // no red squiggles under Taglish text
+  ta.classList.add('ai-output');         // comfortable reading line-height/size
   const status = el('div', {},
     el('div', { class: 'loading', style: { marginBottom: '12px' } }, orbitalMark(22, { spin: true }), el('span', { text: 'Generating with AI…' })),
     skeleton(4));

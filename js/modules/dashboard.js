@@ -273,7 +273,7 @@ function runAudit() {
   ai.openAiEditor({
     title: `AI Account Audit — ${today}`,
     system: `${ai.languageDirective()} You are a senior Philippine performance-marketing strategist auditing a Facebook/TikTok COD e-commerce ad account. Be specific, decisive and prioritized, and use the account's own numbers.`,
-    user: `${buildAuditContext()}\n\nAudit this account and give me a PRIORITIZED action list for TODAY. For each item give: the product/area, the exact action (e.g. "scale +20%", "kill", "fix RTS", "ship 3 new hooks", "log metrics"), and a one-line reason from the data. Explicitly flag: products to SCALE, products to KILL, fatiguing creatives, missing data, and the single biggest opportunity. Keep it punchy — bullets, max ~10 items.`,
+    user: `${buildAuditContext()}\n\nAudit this account and give me a PRIORITIZED action list for TODAY. For each item give: the product/area, the exact action (e.g. "scale +20%", "kill", "fix RTS", "ship 3 new hooks", "log metrics"), and a one-line reason from the data. Explicitly flag: products to SCALE, products to KILL, fatiguing creatives, missing data, and the single biggest opportunity. Keep it punchy — max ~10 items. Plain readable text only — no markdown symbols (no **, no #); start each item with "• ".`,
     saveLabel: 'Save to daily report',
     onSave: (text) => { const prev = store.getDailyReport(today); store.saveDailyReport(today, (prev ? prev + '\n\n' : '') + 'AUDIT:\n' + text); toast('Saved to daily report.', 'success'); },
   });

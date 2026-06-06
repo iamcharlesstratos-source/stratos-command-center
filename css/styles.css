@@ -307,6 +307,8 @@ button { font-family: inherit; }
 .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 .input::placeholder { color: var(--text-dim); opacity: .7; }
 .textarea { resize: vertical; min-height: 64px; line-height: 1.55; }
+/* AI output: roomy, readable, no spellcheck squiggles */
+.ai-output { line-height: 1.75; font-size: 13.5px; padding: 14px 16px; min-height: 340px; }
 .select { appearance: none; cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2393A0BD' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 11px center; padding-right: 30px;
