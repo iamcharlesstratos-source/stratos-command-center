@@ -9,13 +9,15 @@
 import * as store from '../store.js';
 import * as metrics from '../metrics.js';
 import * as ai from '../ai.js';
+import * as meta from '../meta.js';
 import {
   el, clear, button, pill, field, input, select, sortableTable, pageHeader, card,
-  statTile, toast, emptyState, textarea, openModal, sparkline, dateRangeControl,
+  statTile, toast, emptyState, textarea, openModal, sparkline, dateRangeControl, confirmDialog,
 } from '../ui.js';
-import { todayStr, yesterdayStr, toNum, debounce, resolveRange, inRange } from '../util.js';
+import { todayStr, yesterdayStr, toNum, debounce, resolveRange, inRange, nowISO } from '../util.js';
 
 let selectedDate = todayStr();
+let autoPulledFor = ''; // guards the once-per-open auto-sync from looping
 
 // Advertisers are admins; Graphic Artists view metrics read-only (no entry/import).
 const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
@@ -30,17 +32,35 @@ export function render(view) {
   const cfg = store.getConfig();
 
   // ---- header + date picker ----
+  const mc = store.getMetaConfig();
+  const connected = !!(mc.token && mc.accountId);
+  const metaBtns = isAdmin()
+    ? (connected
+        ? [
+            button('⤓ Sync Meta', { variant: 'primary', title: `Pull ${mc.accountName || ('act ' + mc.accountId)} for ${selectedDate}`, onClick: () => syncMeta(view, selectedDate, false) }),
+            button('⚙', { variant: 'ghost', title: 'Meta connection settings', onClick: () => openMetaConnect(view) }),
+          ]
+        : [button('🔗 Connect Meta', { variant: 'ghost', onClick: () => openMetaConnect(view) })])
+    : [];
+
   const dateInput = el('input', { class: 'input', type: 'date', value: selectedDate, style: { width: 'auto' } });
   dateInput.addEventListener('change', () => { selectedDate = dateInput.value || todayStr(); rerender(view); });
   view.appendChild(pageHeader(
     'Daily Metrics',
     'Which product is winning, losing, or ready to scale — for the selected day.',
     [
+      ...metaBtns,
       isAdmin() ? button('⇪ Paste import', { variant: 'ghost', onClick: () => openImportModal(view) }) : null,
       el('div', { class: 'row', style: { alignItems: 'center', gap: '8px' } },
         el('span', { class: 'field__label', text: 'Date' }), dateInput),
     ].filter(Boolean),
   ));
+
+  // Auto-pull today's numbers once per app-open when connected + enabled.
+  if (connected && mc.autoPull && selectedDate === todayStr() && autoPulledFor !== selectedDate) {
+    autoPulledFor = selectedDate;
+    syncMeta(view, selectedDate, true);
+  }
 
   if (!products.length) {
     view.appendChild(emptyState('Add products first (Module 1) before logging daily metrics.',
@@ -99,6 +119,95 @@ function rerender(view) { clear(view); render(view); }
 function roasTone(r, cfg) {
   const label = metrics.labelForRoas(r, cfg.thresholds);
   return label === 'Scale' ? 'good' : label === 'Observe' ? 'warn' : label === 'Kill' ? 'bad' : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Meta (Facebook) Ads — connect once, then auto-fill Daily Metrics
+// ---------------------------------------------------------------------------
+async function syncMeta(view, dateStr, silent) {
+  const mc = store.getMetaConfig();
+  if (!mc.token || !mc.accountId) { openMetaConnect(view); return; }
+  if (!silent) toast('Pulling from Meta…', 'info');
+  try {
+    const rows = await meta.pullDay(mc.token, mc.accountId, dateStr);
+    const products = store.getProducts();
+    const { byCode, unmapped } = meta.mapRowsToProducts(rows, products);
+    const codes = Object.keys(byCode);
+    for (const code of codes) {
+      const m = byCode[code];
+      store.upsertDailyMetric({ productCode: code, date: dateStr, spend: round2(m.spend), revenue: Math.round(m.revenue), impressions: Math.round(m.impressions), clicks: Math.round(m.clicks), purchases: Math.round(m.purchases) });
+      metrics.recomputeStatus(code);
+    }
+    store.setMetaConfig({ lastPull: dateStr, lastPullAt: nowISO() });
+    if (dateStr === todayStr()) autoPulledFor = dateStr; // don't double-pull on the follow-up render
+    if (codes.length || !silent) {
+      toast(`Synced ${codes.length} product(s) from Meta for ${dateStr}${unmapped.length ? ` · ${unmapped.length} campaign(s) unmapped` : ''}.`, codes.length ? 'success' : 'warn');
+    }
+    if (unmapped.length && !silent) {
+      console.info('[meta] unmapped campaigns (no product code found in name):', unmapped);
+    }
+    rerender(view);
+  } catch (err) {
+    toast(`Meta sync failed: ${err.message}`, 'error');
+  }
+}
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+function openMetaConnect(view) {
+  const mc = store.getMetaConfig();
+  const tokenInput = el('input', { class: 'input', type: 'password', value: mc.token || '', placeholder: 'Paste Meta access token (ads_read)…' });
+  let accountSel = select([{ value: mc.accountId || '', label: mc.accountId ? (mc.accountName || ('act ' + mc.accountId)) : '— fetch accounts first —' }], { value: mc.accountId || '' });
+  const accountWrap = el('div', {}, accountSel);
+  const autoChk = el('input', { type: 'checkbox' }); autoChk.checked = mc.autoPull !== false;
+  const statusLine = el('div', { class: 'field__hint', style: { minHeight: '16px' } });
+
+  let accounts = [];
+  const fetchBtn = button('Fetch accounts', { variant: 'ghost', onClick: async () => {
+    const tok = tokenInput.value.trim();
+    if (!tok) { statusLine.textContent = 'Paste a token first.'; statusLine.style.color = 'var(--warn)'; return; }
+    statusLine.textContent = 'Fetching ad accounts…'; statusLine.style.color = '';
+    try {
+      accounts = await meta.listAccounts(tok);
+      if (!accounts.length) { statusLine.textContent = 'No ad accounts visible to this token.'; statusLine.style.color = 'var(--warn)'; return; }
+      const newSel = select(accounts.map((a) => ({ value: a.accountId, label: `${a.name} (act_${a.accountId})${a.currency ? ' · ' + a.currency : ''}` })), { value: mc.accountId || accounts[0].accountId });
+      clear(accountWrap); accountWrap.appendChild(newSel); accountSel = newSel;
+      statusLine.textContent = `Found ${accounts.length} ad account(s). Pick one and Save.`; statusLine.style.color = 'var(--good)';
+    } catch (err) {
+      statusLine.textContent = `Could not fetch: ${err.message}`; statusLine.style.color = 'var(--bad)';
+    }
+  } });
+
+  const body = el('div', { class: 'stack' },
+    el('div', { class: 'banner banner--info' }, el('span', { text: '🔒 Your token stays on THIS device only — it is never synced to the team or included in backups. Use a read-only (ads_read) token.' })),
+    field('Access token', el('div', { class: 'row', style: { gap: '8px' } }, tokenInput, fetchBtn), { hint: 'Get one at developers.facebook.com → Tools → Graph API Explorer (permission: ads_read), or a System User token for long life.' }),
+    field('Ad account', accountWrap),
+    el('label', { class: 'row', style: { gap: '8px', alignItems: 'center', cursor: 'pointer' } }, autoChk, el('span', { text: 'Auto-pull today’s numbers when I open the app' })),
+    statusLine,
+    el('p', { class: 'field__hint', text: 'Mapping: each campaign is matched to a product by finding the product CODE inside the campaign name (e.g. “GINKGO-01 - Senior - ABO” → GINKGO-01). Name campaigns with the code for clean auto-fill.' }),
+  );
+
+  openModal({
+    title: 'Connect Meta (Facebook Ads)', width: 600, body,
+    actions: [
+      mc.token ? { label: 'Disconnect', variant: 'ghost', onClick: async (close) => {
+        if (await confirmDialog({ title: 'Disconnect Meta?', message: 'Removes the token from this device. Imported data stays.', confirmText: 'Disconnect', danger: true })) {
+          store.disconnectMeta(); toast('Meta disconnected.', 'success'); close(); rerender(view);
+        }
+      } } : null,
+      { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
+      { label: 'Save', variant: 'primary', onClick: (close) => {
+        const tok = tokenInput.value.trim();
+        const acct = accountSel.value;
+        if (!tok) { statusLine.textContent = 'Paste a token first.'; statusLine.style.color = 'var(--warn)'; return; }
+        if (!acct) { statusLine.textContent = 'Fetch and pick an ad account.'; statusLine.style.color = 'var(--warn)'; return; }
+        const found = accounts.find((a) => a.accountId === acct);
+        store.setMetaConfig({ token: tok, accountId: acct, accountName: found ? found.name : (mc.accountName || ''), autoPull: autoChk.checked });
+        autoPulledFor = ''; // allow an immediate auto/sync after (re)connect
+        toast('Meta connected. Hit “⤓ Sync Meta” or it auto-pulls today.', 'success');
+        close(); rerender(view);
+      } },
+    ].filter(Boolean),
+  });
 }
 
 // ---------------------------------------------------------------------------
