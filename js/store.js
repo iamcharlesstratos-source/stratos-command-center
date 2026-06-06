@@ -573,7 +573,9 @@ export function importAll(payload) {
 /** Wipe all app data (used by tests / "reset everything"). */
 export function wipeAll() {
   for (const key of Object.values(KEYS)) localStorage.removeItem(key);
+  for (const k of [META_KEY, DATE_RANGE_KEY]) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
   for (const name of Object.keys(KEYS)) emit(name);
+  emit('meta', getMetaConfig()); emit('dateRange');
 }
 
 /** Aggregate counts + product status breakdown for the header summary chips. */

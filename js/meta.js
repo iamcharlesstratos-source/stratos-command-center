@@ -35,7 +35,7 @@ export async function pullDay(token, accountId, dateStr) {
       const spend = num(r.spend);
       const purchases = pickAction(r.actions, PURCHASE_TYPES);
       let revenue = pickAction(r.action_values, PURCHASE_TYPES);
-      if (!revenue && r.purchase_roas) revenue = roasValue(r.purchase_roas) * spend;
+      if (!revenue && r.purchase_roas) revenue = roasValue(r.purchase_roas, PURCHASE_TYPES) * spend;
       out.push({
         campaignName: r.campaign_name || '',
         spend,
@@ -66,7 +66,7 @@ export async function pullRange(token, accountId, since, until) {
       const spend = num(r.spend);
       const purchases = pickAction(r.actions, PURCHASE_TYPES);
       let revenue = pickAction(r.action_values, PURCHASE_TYPES);
-      if (!revenue && r.purchase_roas) revenue = roasValue(r.purchase_roas) * spend;
+      if (!revenue && r.purchase_roas) revenue = roasValue(r.purchase_roas, PURCHASE_TYPES) * spend;
       out.push({
         date: String(r.date_start || '').slice(0, 10),
         campaignName: r.campaign_name || '',
@@ -79,6 +79,7 @@ export async function pullRange(token, accountId, since, until) {
     }
     url = data.paging && data.paging.next ? data.paging.next : null;
   }
+  if (url) throw new Error('Too many pages for this range — narrow the date range and sync again.');
   return out;
 }
 
@@ -146,9 +147,10 @@ function pickAction(arr, types) {
   return 0;
 }
 
-function roasValue(roas) {
-  if (Array.isArray(roas)) return num(roas[0] && roas[0].value);
-  return num(roas);
+function roasValue(roas, types) {
+  if (!Array.isArray(roas)) return num(roas);
+  if (types) { for (const t of types) { const hit = roas.find((x) => x.action_type === t); if (hit) return num(hit.value); } }
+  return num(roas[0] && roas[0].value);
 }
 
 function matchCode(name, products) {

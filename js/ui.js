@@ -178,7 +178,7 @@ export function dateRangeControl({ value, onChange } = {}) {
     fromIn.value = rr.since || todayStr();
     toIn.value = (rr.until && rr.until !== '9999-12-31') ? rr.until : todayStr();
   };
-  const outside = (e) => { if (!wrap.contains(e.target)) close(); };
+  const outside = (e) => { if (!wrap.isConnected) { document.removeEventListener('click', outside); return; } if (!wrap.contains(e.target)) close(); };
   function open() { syncPanel(); panel.style.display = ''; setTimeout(() => document.addEventListener('click', outside), 0); }
   function close() { panel.style.display = 'none'; document.removeEventListener('click', outside); }
   function apply() { renderBtn(); close(); if (onChange) onChange(resolveRange(current), current); }

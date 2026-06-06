@@ -139,7 +139,10 @@ export function resolveRange(range, ref = new Date()) {
 /** Inclusive membership test for a YYYY-MM-DD (or ISO) date against a resolved range. */
 export function inRange(dateStr, resolved) {
   if (!dateStr || !resolved) return false;
-  const d = String(dateStr).slice(0, 10);
+  // Normalize a full ISO timestamp (UTC) to a LOCAL calendar date so it lines up
+  // with resolveRange's local since/until; plain YYYY-MM-DD strings pass through.
+  const s = String(dateStr);
+  const d = /T.*([Zz]|[+-]\d\d:?\d\d)/.test(s) ? todayStr(new Date(s)) : s.slice(0, 10);
   if (resolved.since && d < resolved.since) return false;
   if (resolved.until && d > resolved.until) return false;
   return true;

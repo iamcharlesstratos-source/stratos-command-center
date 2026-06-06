@@ -293,7 +293,7 @@ function runAudit() {
 // War Room — today's direction (Marketing Head sets it; whole team sees it)
 // ---------------------------------------------------------------------------
 const WARROOM_ANGLES = ['Pain', 'Senior', 'Testimonial', 'Problem-Solution', 'Promo', 'Doctor', 'Lifestyle'];
-const dateOf = (iso) => (iso || '').slice(0, 10);
+const dateOf = (iso) => (iso ? todayStr(new Date(iso)) : ''); // UTC ISO → local calendar date
 
 function renderWarRoom() {
   const today = todayStr();
