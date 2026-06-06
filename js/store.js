@@ -22,6 +22,7 @@ export const KEYS = {
   competitors: `${NS}:competitors`,
   hooks: `${NS}:hooks`,        // Module 2 reusable hook bank
   experiments: `${NS}:experiments`, // A/B tests / experiment log
+  briefs: `${NS}:briefs`,      // War Room daily brief, keyed by date
   dailyReports: `${NS}:dailyReports`, // Module 3 AI daily reports, keyed by date
   config: `${NS}:config`,
 };
@@ -440,6 +441,19 @@ export function saveDailyReport(date, text) {
   emit('dailyReports', { date });
 }
 
+// ---- War Room daily brief (keyed by date): { focusCode, angle, targetVideos, targetImages, note } ----
+export function getBrief(date) {
+  const all = readRaw(KEYS.briefs, {});
+  return (all && all[date]) || null;
+}
+export function saveBrief(date, patch) {
+  const all = readRaw(KEYS.briefs, {}) || {};
+  all[date] = { ...(all[date] || {}), ...patch };
+  writeRaw(KEYS.briefs, all);
+  emit('briefs', { date });
+  return all[date];
+}
+
 // ===========================================================================
 // CONFIG (thresholds, weights, team, AI settings)
 // ===========================================================================
@@ -482,6 +496,7 @@ export function exportAll() {
       competitors: getCompetitors(),
       hooks: getHooks(),
       experiments: getExperiments(),
+      briefs: readRaw(KEYS.briefs, {}),
       dailyReports: readRaw(KEYS.dailyReports, {}),
       config: readRaw(KEYS.config, {}), // store only the overrides, not merged defaults
     },
@@ -508,6 +523,9 @@ export function importAll(payload) {
     const arr = Array.isArray(d[name]) ? d[name] : [];
     writeRaw(KEYS[name], arr);
     summary[name] = arr.length;
+  }
+  if (d.briefs && typeof d.briefs === 'object') {
+    writeRaw(KEYS.briefs, d.briefs);
   }
   if (d.dailyReports && typeof d.dailyReports === 'object') {
     writeRaw(KEYS.dailyReports, d.dailyReports);

@@ -5,8 +5,8 @@
 import * as store from '../store.js';
 import * as metrics from '../metrics.js';
 import * as ai from '../ai.js';
-import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, lineChart, barChart, countUp } from '../ui.js';
-import { todayStr, yesterdayStr } from '../util.js';
+import { el, button, pageHeader, statTile, card, pill, toast, confirmDialog, field, input, select, lineChart, barChart, countUp } from '../ui.js';
+import { todayStr, yesterdayStr, toNum } from '../util.js';
 
 const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
 
@@ -46,6 +46,9 @@ export function render(view) {
     ));
     return;
   }
+
+  // ---- 0) WAR ROOM — today's direction (everyone sees it; admin sets it) ----
+  view.appendChild(renderWarRoom());
 
   // ---- 1) ACTION NEEDED (alerts first) ----
   const alerts = metrics.computeAlerts();
@@ -277,6 +280,76 @@ function runAudit() {
     saveLabel: 'Save to daily report',
     onSave: (text) => { const prev = store.getDailyReport(today); store.saveDailyReport(today, (prev ? prev + '\n\n' : '') + 'AUDIT:\n' + text); toast('Saved to daily report.', 'success'); },
   });
+}
+
+// ---------------------------------------------------------------------------
+// War Room — today's direction (Marketing Head sets it; whole team sees it)
+// ---------------------------------------------------------------------------
+const WARROOM_ANGLES = ['Pain', 'Senior', 'Testimonial', 'Problem-Solution', 'Promo', 'Doctor', 'Lifestyle'];
+const dateOf = (iso) => (iso || '').slice(0, 10);
+
+function renderWarRoom() {
+  const today = todayStr();
+  const admin = isAdmin();
+  const brief = store.getBrief(today) || {};
+  const products = store.getProducts();
+  const creatives = store.getCreatives();
+
+  const createdToday = creatives.filter((x) => dateOf(x.createdAt) === today);
+  const vids = createdToday.filter((x) => x.type === 'video').length;
+  const imgs = createdToday.filter((x) => x.type === 'image').length;
+  const launched = creatives.filter((x) => x.status === 'Launched' && dateOf(x.updatedAt) === today).length;
+  const killed = creatives.filter((x) => x.status === 'Loser' && dateOf(x.updatedAt) === today).length;
+  const winners = creatives.filter((x) => x.status === 'Winner').length;
+
+  const c = el('section', { class: 'card', style: { borderLeft: '3px solid var(--accent)' } });
+  c.appendChild(el('div', { class: 'spread', style: { marginBottom: '8px' } },
+    el('h3', { class: 'card__title', style: { margin: 0 }, text: "🪖 War Room — today's direction" }),
+    el('span', { class: 'field__hint', text: today })));
+
+  if (admin) {
+    const focusSel = select([{ value: '', label: '— pick focus product —' }, ...products.map((p) => ({ value: p.code, label: `${p.code} — ${p.name}` }))], { value: brief.focusCode || '' });
+    const angleSel = select(['', ...WARROOM_ANGLES].map((a) => ({ value: a, label: a || '— pick angle —' })), { value: brief.angle || '' });
+    const vidTarget = input({ type: 'number', min: 0, value: brief.targetVideos != null ? brief.targetVideos : 5 });
+    const imgTarget = input({ type: 'number', min: 0, value: brief.targetImages != null ? brief.targetImages : 3 });
+    const noteInput = input({ value: brief.note || '', placeholder: 'e.g. Senior pain-relief angle, Buy 1 Take 1, Send Message CTA' });
+    c.appendChild(el('div', { class: 'form-grid' },
+      field('Focus product', focusSel),
+      field('Angle', angleSel),
+      field('Target videos', vidTarget),
+      field('Target images', imgTarget)));
+    c.appendChild(field('Direction note', noteInput));
+    c.appendChild(el('div', { class: 'row', style: { gap: '8px', marginTop: '8px' } },
+      button('Set direction', { variant: 'primary', onClick: () => {
+        store.saveBrief(today, { focusCode: focusSel.value, angle: angleSel.value, targetVideos: toNum(vidTarget.value), targetImages: toNum(imgTarget.value), note: noteInput.value });
+        toast("Today's direction set — the team sees it now.", 'success'); rerenderDash();
+      } })));
+  } else {
+    const fp = brief.focusCode ? store.getProduct(brief.focusCode) : null;
+    const has = brief.focusCode || brief.angle || brief.note;
+    c.appendChild(el('p', { class: has ? '' : 'muted', style: { margin: '0 0 4px' } },
+      has
+        ? el('span', {}, el('b', { text: 'Focus: ' }), document.createTextNode(fp ? `${fp.code} — ${fp.name || ''}` : (brief.focusCode || '—')), brief.angle ? document.createTextNode(`   ·   Angle: ${brief.angle}`) : null)
+        : document.createTextNode('No direction set yet — waiting for the Marketing Head.')));
+    if (brief.note) c.appendChild(el('p', { class: 'field__hint', style: { margin: 0 }, text: brief.note }));
+    if (brief.targetVideos || brief.targetImages) c.appendChild(el('p', { class: 'field__hint', style: { margin: '4px 0 0' }, text: `Target: ${brief.targetVideos || 0} videos · ${brief.targetImages || 0} images` }));
+  }
+
+  const bar = (label, n, target) => {
+    const pct = target > 0 ? Math.min(100, Math.round((n / target) * 100)) : (n > 0 ? 100 : 0);
+    return el('div', { style: { marginTop: '8px' } },
+      el('div', { class: 'spread', style: { fontSize: '12px', marginBottom: '3px' } }, el('span', { text: label }), el('b', { text: `${n}${target ? ' / ' + target : ''}` })),
+      el('div', { class: 'gauge__track' }, el('div', { class: 'gauge__fill', style: { width: pct + '%' } })));
+  };
+  c.appendChild(el('div', { class: 'grid grid-2', style: { gap: '12px', marginTop: '10px' } },
+    bar('🎬 Videos produced today', vids, brief.targetVideos || 0),
+    bar('🖼️ Images produced today', imgs, brief.targetImages || 0)));
+  c.appendChild(el('div', { class: 'row', style: { gap: '16px', marginTop: '10px', fontSize: '12px', flexWrap: 'wrap', alignItems: 'center' } },
+    el('span', {}, el('b', { text: String(launched) }), document.createTextNode(' launched today')),
+    el('span', {}, el('b', { text: String(killed) }), document.createTextNode(' killed today')),
+    el('span', {}, el('b', { style: { color: 'var(--good)' }, text: String(winners) }), document.createTextNode(' winners total')),
+    el('a', { href: '#/creatives', class: 'btn btn--ghost btn--sm', text: '+ New creative' })));
+  return c;
 }
 
 // ---------------------------------------------------------------------------
