@@ -33,12 +33,14 @@ export function render(view) {
 
   // ---- header + date picker ----
   const mc = store.getMetaConfig();
-  const connected = !!(mc.token && mc.accountId);
+  const accts = selectedAccounts(mc);
+  const connected = !!(mc.token && accts.length);
   const metaBtns = isAdmin()
     ? (connected
         ? [
-            button('⤓ Sync Meta', { variant: 'primary', title: `Pull ${mc.accountName || ('act ' + mc.accountId)} for ${selectedDate}`, onClick: () => syncMeta(view, selectedDate, false) }),
-            button('⚙', { variant: 'ghost', title: 'Meta connection settings', onClick: () => openMetaConnect(view) }),
+            button('⤓ Sync today', { variant: 'primary', title: `Pull ${selectedDate} from ${accts.length} account(s)`, onClick: () => syncMeta(view, selectedDate, false) }),
+            button('⤓ Sync range', { variant: 'ghost', title: 'Pull the whole selected date-range (per-day) from Meta', onClick: () => syncMetaRange(view) }),
+            button('⚙', { variant: 'ghost', title: `Meta settings · ${accts.length} account(s)`, onClick: () => openMetaConnect(view) }),
           ]
         : [button('🔗 Connect Meta', { variant: 'ghost', onClick: () => openMetaConnect(view) })])
     : [];
@@ -124,63 +126,127 @@ function roasTone(r, cfg) {
 // ---------------------------------------------------------------------------
 // Meta (Facebook) Ads — connect once, then auto-fill Daily Metrics
 // ---------------------------------------------------------------------------
+// Accounts to sync: the multi-select list, falling back to the legacy single account.
+function selectedAccounts(mc) {
+  if (Array.isArray(mc.accounts) && mc.accounts.length) return mc.accounts;
+  if (mc.accountId) return [{ accountId: mc.accountId, name: mc.accountName || ('act ' + mc.accountId) }];
+  return [];
+}
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function mergeInto(map, code, m) {
+  const a = map[code] || (map[code] = { spend: 0, revenue: 0, impressions: 0, clicks: 0, purchases: 0 });
+  a.spend += m.spend; a.revenue += m.revenue; a.impressions += m.impressions; a.clicks += m.clicks; a.purchases += m.purchases;
+}
+function writeDay(code, dateStr, m) {
+  store.upsertDailyMetric({ productCode: code, date: dateStr, spend: round2(m.spend), revenue: Math.round(m.revenue), impressions: Math.round(m.impressions), clicks: Math.round(m.clicks), purchases: Math.round(m.purchases) });
+}
+
+// Single-day pull across all selected accounts.
 async function syncMeta(view, dateStr, silent) {
   const mc = store.getMetaConfig();
-  if (!mc.token || !mc.accountId) { openMetaConnect(view); return; }
-  if (!silent) toast('Pulling from Meta…', 'info');
+  const accts = selectedAccounts(mc);
+  if (!mc.token || !accts.length) { openMetaConnect(view); return; }
+  if (!silent) toast(`Pulling ${dateStr} from ${accts.length} account(s)…`, 'info');
   try {
-    const rows = await meta.pullDay(mc.token, mc.accountId, dateStr);
     const products = store.getProducts();
-    const { byCode, unmapped } = meta.mapRowsToProducts(rows, products);
-    const codes = Object.keys(byCode);
-    for (const code of codes) {
-      const m = byCode[code];
-      store.upsertDailyMetric({ productCode: code, date: dateStr, spend: round2(m.spend), revenue: Math.round(m.revenue), impressions: Math.round(m.impressions), clicks: Math.round(m.clicks), purchases: Math.round(m.purchases) });
-      metrics.recomputeStatus(code);
+    const merged = {}; const unmapped = new Set();
+    for (const a of accts) {
+      const rows = await meta.pullDay(mc.token, a.accountId, dateStr);
+      const { byCode, unmapped: um } = meta.mapRowsToProducts(rows, products);
+      for (const code of Object.keys(byCode)) mergeInto(merged, code, byCode[code]);
+      um.forEach((x) => unmapped.add(x));
     }
+    const codes = Object.keys(merged);
+    for (const code of codes) { writeDay(code, dateStr, merged[code]); metrics.recomputeStatus(code); }
     store.setMetaConfig({ lastPull: dateStr, lastPullAt: nowISO() });
     if (dateStr === todayStr()) autoPulledFor = dateStr; // don't double-pull on the follow-up render
     if (codes.length || !silent) {
-      toast(`Synced ${codes.length} product(s) from Meta for ${dateStr}${unmapped.length ? ` · ${unmapped.length} campaign(s) unmapped` : ''}.`, codes.length ? 'success' : 'warn');
+      toast(`Synced ${codes.length} product(s) for ${dateStr}${unmapped.size ? ` · ${unmapped.size} unmapped` : ''}.`, codes.length ? 'success' : 'warn');
     }
-    if (unmapped.length && !silent) {
-      console.info('[meta] unmapped campaigns (no product code found in name):', unmapped);
-    }
+    if (unmapped.size && !silent) console.info('[meta] unmapped campaigns:', [...unmapped]);
     rerender(view);
   } catch (err) {
     toast(`Meta sync failed: ${err.message}`, 'error');
   }
 }
-function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+// Whole-range pull (per-day rows) across all selected accounts.
+async function syncMetaRange(view) {
+  const mc = store.getMetaConfig();
+  const accts = selectedAccounts(mc);
+  if (!mc.token || !accts.length) { openMetaConnect(view); return; }
+  const rr = resolveRange(store.getDateRange());
+  let since = rr.since, until = rr.until;
+  if (!since || until === '9999-12-31') { until = todayStr(); since = shiftDay(until, -29); } // 'All time' → cap at last 30d
+  toast(`Pulling ${since} → ${until} from ${accts.length} account(s)… this can take a few seconds.`, 'info');
+  try {
+    const products = store.getProducts();
+    const byDateCode = {}; const unmapped = new Set();
+    for (const a of accts) {
+      const rows = await meta.pullRange(mc.token, a.accountId, since, until);
+      const res = meta.mapRangeRowsToProducts(rows, products);
+      for (const d of Object.keys(res.byDateCode)) {
+        const day = byDateCode[d] || (byDateCode[d] = {});
+        for (const code of Object.keys(res.byDateCode[d])) mergeInto(day, code, res.byDateCode[d][code]);
+      }
+      res.unmapped.forEach((x) => unmapped.add(x));
+    }
+    let nDays = 0, nRows = 0;
+    for (const d of Object.keys(byDateCode)) { nDays++; for (const code of Object.keys(byDateCode[d])) { writeDay(code, d, byDateCode[d][code]); nRows++; } }
+    metrics.recomputeAllStatuses();
+    store.setMetaConfig({ lastPull: todayStr(), lastPullAt: nowISO() });
+    autoPulledFor = todayStr();
+    toast(`Synced ${nRows} row(s) across ${nDays} day(s)${unmapped.size ? ` · ${unmapped.size} unmapped` : ''}.`, nRows ? 'success' : 'warn');
+    rerender(view);
+  } catch (err) {
+    toast(`Meta range sync failed: ${err.message}`, 'error');
+  }
+}
 
 function openMetaConnect(view) {
   const mc = store.getMetaConfig();
   const tokenInput = el('input', { class: 'input', type: 'password', value: mc.token || '', placeholder: 'Paste Meta access token (ads_read)…' });
-  let accountSel = select([{ value: mc.accountId || '', label: mc.accountId ? (mc.accountName || ('act ' + mc.accountId)) : '— fetch accounts first —' }], { value: mc.accountId || '' });
-  const accountWrap = el('div', {}, accountSel);
   const autoChk = el('input', { type: 'checkbox' }); autoChk.checked = mc.autoPull !== false;
   const statusLine = el('div', { class: 'field__hint', style: { minHeight: '16px' } });
 
-  let accounts = [];
+  // Multi-select account list (checkboxes). Seeded from any previously-saved set.
+  const acctHost = el('div', { class: 'stack', style: { gap: '4px', maxHeight: '190px', overflowY: 'auto', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' } });
+  let choices = selectedAccounts(mc).map((a) => ({ accountId: a.accountId, name: a.name, currency: a.currency || '', checked: true }));
+  const renderChoices = () => {
+    clear(acctHost);
+    if (!choices.length) { acctHost.appendChild(el('div', { class: 'muted', style: { fontSize: '12px' }, text: 'Paste a token and “Fetch accounts” to choose.' })); return; }
+    choices.forEach((a) => {
+      const cb = el('input', { type: 'checkbox' }); cb.checked = a.checked;
+      cb.addEventListener('change', () => { a.checked = cb.checked; });
+      acctHost.appendChild(el('label', { class: 'row', style: { gap: '8px', alignItems: 'center', cursor: 'pointer', padding: '2px 0' } },
+        cb, el('span', { style: { fontSize: '13px' }, text: `${a.name} (act_${a.accountId})${a.currency ? ' · ' + a.currency : ''}` })));
+    });
+  };
+  renderChoices();
+
   const fetchBtn = button('Fetch accounts', { variant: 'ghost', onClick: async () => {
     const tok = tokenInput.value.trim();
     if (!tok) { statusLine.textContent = 'Paste a token first.'; statusLine.style.color = 'var(--warn)'; return; }
     statusLine.textContent = 'Fetching ad accounts…'; statusLine.style.color = '';
     try {
-      accounts = await meta.listAccounts(tok);
+      const accounts = await meta.listAccounts(tok);
       if (!accounts.length) { statusLine.textContent = 'No ad accounts visible to this token.'; statusLine.style.color = 'var(--warn)'; return; }
-      const newSel = select(accounts.map((a) => ({ value: a.accountId, label: `${a.name} (act_${a.accountId})${a.currency ? ' · ' + a.currency : ''}` })), { value: mc.accountId || accounts[0].accountId });
-      clear(accountWrap); accountWrap.appendChild(newSel); accountSel = newSel;
-      statusLine.textContent = `Found ${accounts.length} ad account(s). Pick one and Save.`; statusLine.style.color = 'var(--good)';
+      const checkedIds = new Set(choices.filter((a) => a.checked).map((a) => a.accountId));
+      choices = accounts.map((a) => ({ accountId: a.accountId, name: a.name, currency: a.currency || '', checked: checkedIds.has(a.accountId) }));
+      renderChoices();
+      statusLine.textContent = `Found ${accounts.length} account(s). Tick the ones to sync, then Save.`; statusLine.style.color = 'var(--good)';
     } catch (err) {
       statusLine.textContent = `Could not fetch: ${err.message}`; statusLine.style.color = 'var(--bad)';
     }
   } });
 
+  const selectAll = button('Select all', { variant: 'subtle', onClick: () => { choices.forEach((a) => { a.checked = true; }); renderChoices(); } });
+
   const body = el('div', { class: 'stack' },
-    el('div', { class: 'banner banner--info' }, el('span', { text: '🔒 Your token stays on THIS device only — it is never synced to the team or included in backups. Use a read-only (ads_read) token.' })),
-    field('Access token', el('div', { class: 'row', style: { gap: '8px' } }, tokenInput, fetchBtn), { hint: 'Get one at developers.facebook.com → Tools → Graph API Explorer (permission: ads_read), or a System User token for long life.' }),
-    field('Ad account', accountWrap),
+    el('div', { class: 'banner banner--info' }, el('span', { text: '🔒 Your token stays on THIS device only — never synced to the team or in backups. Use a read-only (ads_read) token.' })),
+    field('Access token', el('div', { class: 'row', style: { gap: '8px' } }, tokenInput, fetchBtn), { hint: 'developers.facebook.com → Tools → Graph API Explorer (permission: ads_read), or a System User token for long life.' }),
+    el('div', { class: 'spread', style: { alignItems: 'center' } }, el('span', { class: 'field__label', text: 'Ad accounts to sync' }), selectAll),
+    acctHost,
     el('label', { class: 'row', style: { gap: '8px', alignItems: 'center', cursor: 'pointer' } }, autoChk, el('span', { text: 'Auto-pull today’s numbers when I open the app' })),
     statusLine,
     el('p', { class: 'field__hint', text: 'Mapping: each campaign is matched to a product by finding the product CODE inside the campaign name (e.g. “GINKGO-01 - Senior - ABO” → GINKGO-01). Name campaigns with the code for clean auto-fill.' }),
@@ -197,13 +263,12 @@ function openMetaConnect(view) {
       { label: 'Cancel', variant: 'ghost', onClick: (close) => close() },
       { label: 'Save', variant: 'primary', onClick: (close) => {
         const tok = tokenInput.value.trim();
-        const acct = accountSel.value;
+        const chosen = choices.filter((a) => a.checked).map((a) => ({ accountId: a.accountId, name: a.name }));
         if (!tok) { statusLine.textContent = 'Paste a token first.'; statusLine.style.color = 'var(--warn)'; return; }
-        if (!acct) { statusLine.textContent = 'Fetch and pick an ad account.'; statusLine.style.color = 'var(--warn)'; return; }
-        const found = accounts.find((a) => a.accountId === acct);
-        store.setMetaConfig({ token: tok, accountId: acct, accountName: found ? found.name : (mc.accountName || ''), autoPull: autoChk.checked });
+        if (!chosen.length) { statusLine.textContent = 'Tick at least one ad account.'; statusLine.style.color = 'var(--warn)'; return; }
+        store.setMetaConfig({ token: tok, accounts: chosen, accountId: chosen[0].accountId, accountName: chosen[0].name, autoPull: autoChk.checked });
         autoPulledFor = ''; // allow an immediate auto/sync after (re)connect
-        toast('Meta connected. Hit “⤓ Sync Meta” or it auto-pulls today.', 'success');
+        toast(`Meta connected · ${chosen.length} account(s). Use “⤓ Sync today/range”.`, 'success');
         close(); rerender(view);
       } },
     ].filter(Boolean),

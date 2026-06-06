@@ -469,7 +469,7 @@ export function setDateRange(range) {
 // ---- Meta (Facebook) Ads connection (PERSONAL/DEVICE-LOCAL — never synced, ----
 //      never exported: the access token must NOT leave this browser). -----------
 const META_KEY = `${NS}:meta`;
-const META_DEFAULTS = { token: '', accountId: '', accountName: '', autoPull: true, lastPull: '', lastPullAt: '' };
+const META_DEFAULTS = { token: '', accountId: '', accountName: '', accounts: [], autoPull: true, lastPull: '', lastPullAt: '' };
 export function getMetaConfig() {
   const v = readRaw(META_KEY, null);
   return { ...META_DEFAULTS, ...(v && typeof v === 'object' ? v : {}) };

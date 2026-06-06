@@ -51,6 +51,56 @@ export async function pullDay(token, accountId, dateStr) {
 }
 
 /**
+ * Pull campaign insights for a date range, broken down PER DAY (time_increment=1).
+ * Returns rows with a `date`: [{ date, campaignName, spend, impressions, clicks, purchases, revenue }].
+ */
+export async function pullRange(token, accountId, since, until) {
+  const tr = encodeURIComponent(JSON.stringify({ since, until }));
+  const fields = 'campaign_name,spend,impressions,clicks,actions,action_values,purchase_roas';
+  let url = `${GRAPH}/act_${accountId}/insights?level=campaign&time_increment=1&time_range=${tr}&fields=${fields}&limit=400&access_token=${encodeURIComponent(token)}`;
+  const out = [];
+  let guard = 0;
+  while (url && guard++ < 80) {
+    const data = await getJSON(url);
+    for (const r of (data.data || [])) {
+      const spend = num(r.spend);
+      const purchases = pickAction(r.actions, PURCHASE_TYPES);
+      let revenue = pickAction(r.action_values, PURCHASE_TYPES);
+      if (!revenue && r.purchase_roas) revenue = roasValue(r.purchase_roas) * spend;
+      out.push({
+        date: String(r.date_start || '').slice(0, 10),
+        campaignName: r.campaign_name || '',
+        spend,
+        impressions: num(r.impressions),
+        clicks: num(r.clicks),
+        purchases,
+        revenue,
+      });
+    }
+    url = data.paging && data.paging.next ? data.paging.next : null;
+  }
+  return out;
+}
+
+/**
+ * Aggregate per-day raw rows onto products keyed by (date, code).
+ * → { byDateCode: { 'YYYY-MM-DD': { code: {spend,...} } }, unmapped:[names] }.
+ */
+export function mapRangeRowsToProducts(rows, products) {
+  const byDateCode = {};
+  const unmapped = new Set();
+  for (const row of rows) {
+    if (!row.date) continue;
+    const code = matchCode(row.campaignName, products);
+    if (!code) { if (row.spend > 0 || row.impressions > 0) unmapped.add(row.campaignName || '(unnamed)'); continue; }
+    const day = byDateCode[row.date] || (byDateCode[row.date] = {});
+    const a = day[code] || (day[code] = { spend: 0, revenue: 0, impressions: 0, clicks: 0, purchases: 0 });
+    a.spend += row.spend; a.revenue += row.revenue; a.impressions += row.impressions; a.clicks += row.clicks; a.purchases += row.purchases;
+  }
+  return { byDateCode, unmapped: [...unmapped] };
+}
+
+/**
  * Aggregate raw campaign rows onto STRATOS products by matching the product code
  * inside the campaign name. → { byCode: {code:{spend,...}}, unmapped:[names] }.
  */
