@@ -290,6 +290,31 @@ button { font-family: inherit; }
 .gauge__fill { height: 100%; border-radius: var(--radius-pill); background: var(--grad); transition: width .3s; }
 .gauge__label { font-weight: 650; font-size: 13px; white-space: nowrap; }
 
+/* Date-range picker (Meta-style) */
+.daterange { position: relative; display: inline-block; }
+.daterange__btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.daterange__icon { font-size: 13px; }
+.daterange__caret { opacity: .6; font-size: 11px; }
+.daterange__panel {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 60;
+  width: 300px; max-width: min(300px, 90vw); padding: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0,0,0,.28);
+}
+.daterange__presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.daterange__preset {
+  text-align: left; padding: 7px 10px; font-size: 12.5px; cursor: pointer;
+  background: var(--surface-2); color: var(--text); border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+.daterange__preset:hover { border-color: var(--border); }
+.daterange__preset.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.daterange__customlabel { margin: 12px 0 6px; font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+.daterange__custom { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.daterange__custom .field { margin: 0; }
+.daterange__custom .input { padding: 6px 8px; }
+.daterange__tz { margin-top: 10px; font-size: 11px; color: var(--text-dim); }
+
 /* =========================================================================
    Forms
    ========================================================================= */

@@ -8,41 +8,25 @@
 
 import * as store from '../store.js';
 import * as metrics from '../metrics.js';
-import { el, button, pageHeader, card, statTile, sortableTable, input, field, toast } from '../ui.js';
-import { todayStr } from '../util.js';
+import { el, button, pageHeader, card, statTile, sortableTable, input, field, toast, dateRangeControl } from '../ui.js';
+import { resolveRange, inRange } from '../util.js';
 
 const APPROVED_SET = ['Approved', 'Launched', 'Winner'];
 const isAdmin = () => !window.STRATOS || window.STRATOS.isAdmin();
-const dateOf = (iso) => (iso || '').slice(0, 10);
-let windowKey = 'week'; // week | 7d | 30d | all
-
-function fmtDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function windowSince(key) {
-  const d = new Date(todayStr() + 'T00:00:00');
-  if (key === 'all') return { since: '', label: 'All time' };
-  if (key === 'week') { const off = (d.getDay() + 6) % 7; d.setDate(d.getDate() - off); return { since: fmtDate(d), label: 'This week' }; }
-  if (key === '7d') { d.setDate(d.getDate() - 6); return { since: fmtDate(d), label: 'Last 7 days' }; }
-  d.setDate(d.getDate() - 29); return { since: fmtDate(d), label: 'Last 30 days' };
-}
 
 export function render(view) {
   const cfg = store.getConfig();
   const quota = Number(cfg.creativeQuota) > 0 ? Number(cfg.creativeQuota) : 10;
-  const { since, label } = windowSince(windowKey);
+  const range = store.getDateRange();
+  const rr = resolveRange(range);
+  const label = rr.label;
 
-  const segHost = el('div', { class: 'segmented' });
-  [['week', 'This week'], ['7d', '7 days'], ['30d', '30 days'], ['all', 'All time']].forEach(([k, lbl]) => {
-    const b = el('button', { type: 'button', text: lbl, class: k === windowKey ? 'active' : '' });
-    b.addEventListener('click', () => { windowKey = k; rerender(view); });
-    segHost.appendChild(b);
-  });
+  const picker = dateRangeControl({ value: range, onChange: (resolved, raw) => { store.setDateRange(raw); rerender(view); } });
 
-  view.appendChild(pageHeader('Team Scorecards', 'Who shipped what — creatives, winners, win rate & output vs quota.', [segHost]));
+  view.appendChild(pageHeader('Team Scorecards', 'Who shipped what — creatives, winners, win rate & output vs quota.', [picker]));
 
   const allCreatives = store.getCreatives();
-  const inWindow = (c) => !since || dateOf(c.createdAt) >= since;
+  const inWindow = (c) => inRange(c.createdAt, rr);
   const creatives = allCreatives.filter(inWindow);
 
   // Build the roster: configured team + anyone actually assigned work.
@@ -108,18 +92,18 @@ export function render(view) {
   }
 
   // Account-wide card (advertiser group) — campaigns aren't per-person attributable
-  view.appendChild(renderAccountCard(since, label));
+  view.appendChild(renderAccountCard(rr));
 }
 
 function rerender(view) { while (view.firstChild) view.removeChild(view.firstChild); render(view); }
 
-function renderAccountCard(since, label) {
-  const rows = store.getDailyMetrics().filter((r) => !since || r.date >= since);
+function renderAccountCard(rr) {
+  const rows = store.getDailyMetrics().filter((r) => inRange(r.date, rr));
   const agg = metrics.aggregate(rows);
   let profit = 0;
   for (const r of rows) profit += metrics.profit(r, store.getProduct(r.productCode));
   const c = el('section', { class: 'card' });
-  c.appendChild(el('h3', { class: 'card__title', text: `📈 Account — advertisers (${label.toLowerCase()})` }));
+  c.appendChild(el('h3', { class: 'card__title', text: `📈 Account — advertisers (${rr.label.toLowerCase()})` }));
   c.appendChild(el('p', { class: 'field__hint', style: { marginTop: 0 }, text: 'Account-wide totals from Daily Metrics. Campaigns aren’t attributed to one advertiser, so this is the shared advertiser KPI.' }));
   if (!rows.length) { c.appendChild(el('p', { class: 'muted', style: { margin: 0 }, text: 'No daily metrics in this window yet.' })); return c; }
   c.appendChild(el('div', { class: 'grid grid-4' },

@@ -1,7 +1,7 @@
 // ui.js — shared UI primitives reused by every module.
 // Pure DOM helpers (no store import) so there are no module cycles.
 
-import { escapeHtml } from './util.js';
+import { escapeHtml, RANGE_PRESETS, resolveRange, todayStr } from './util.js';
 
 // ---------------------------------------------------------------------------
 // el() — terse hyperscript-style DOM builder
@@ -130,6 +130,61 @@ export function slider({ value = 3, min = 1, max = 5, step = 1, onInput } = {}) 
   });
   wrap.appendChild(range);
   wrap.appendChild(out);
+  return wrap;
+}
+
+// ---------------------------------------------------------------------------
+// Date-range picker (Meta-Ads-Manager style): a button + popover with presets
+// and a custom From/To range. onChange(resolved, raw) fires on selection.
+//   value: a preset key string or { preset, since, until }
+// ---------------------------------------------------------------------------
+export function dateRangeControl({ value, onChange } = {}) {
+  let current = value && typeof value === 'object' ? { ...value } : { preset: value || 'last_7d' };
+  const wrap = el('div', { class: 'daterange' });
+  const btn = el('button', { type: 'button', class: 'btn btn--ghost daterange__btn' });
+  const panel = el('div', { class: 'daterange__panel', style: { display: 'none' } });
+
+  const renderBtn = () => {
+    clear(btn);
+    btn.appendChild(el('span', { class: 'daterange__icon', text: '📅' }));
+    btn.appendChild(el('span', { text: resolveRange(current).label }));
+    btn.appendChild(el('span', { class: 'daterange__caret', text: '▾' }));
+  };
+
+  const presetWrap = el('div', { class: 'daterange__presets' });
+  RANGE_PRESETS.forEach((p) => {
+    const b = el('button', { type: 'button', class: 'daterange__preset', text: p.label });
+    b.addEventListener('click', () => { current = { preset: p.key }; apply(); });
+    presetWrap.appendChild(b);
+  });
+
+  const fromIn = el('input', { class: 'input', type: 'date' });
+  const toIn = el('input', { class: 'input', type: 'date' });
+  const applyCustom = el('button', { class: 'btn btn--primary btn--sm', type: 'button', text: 'Apply' });
+  applyCustom.addEventListener('click', () => { current = { preset: 'custom', since: fromIn.value, until: toIn.value }; apply(); });
+  const customRow = el('div', { class: 'daterange__custom' },
+    field('From', fromIn), field('To', toIn), applyCustom);
+
+  panel.appendChild(presetWrap);
+  panel.appendChild(el('div', { class: 'daterange__customlabel', text: 'Custom range' }));
+  panel.appendChild(customRow);
+  panel.appendChild(el('div', { class: 'daterange__tz', text: 'Dates use this device’s local time (Manila).' }));
+  wrap.appendChild(btn);
+  wrap.appendChild(panel);
+
+  const syncPanel = () => {
+    presetWrap.querySelectorAll('.daterange__preset').forEach((b, i) => b.classList.toggle('active', RANGE_PRESETS[i].key === current.preset));
+    const rr = resolveRange(current);
+    fromIn.value = rr.since || todayStr();
+    toIn.value = (rr.until && rr.until !== '9999-12-31') ? rr.until : todayStr();
+  };
+  const outside = (e) => { if (!wrap.contains(e.target)) close(); };
+  function open() { syncPanel(); panel.style.display = ''; setTimeout(() => document.addEventListener('click', outside), 0); }
+  function close() { panel.style.display = 'none'; document.removeEventListener('click', outside); }
+  function apply() { renderBtn(); close(); if (onChange) onChange(resolveRange(current), current); }
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); panel.style.display === 'none' ? open() : close(); });
+  renderBtn();
   return wrap;
 }
 

@@ -454,6 +454,18 @@ export function saveBrief(date, patch) {
   return all[date];
 }
 
+// ---- Date-range view preference (PERSONAL — not synced, not in export) -------
+const DATE_RANGE_KEY = `${NS}:dateRange`;
+export function getDateRange() {
+  const v = readRaw(DATE_RANGE_KEY, null);
+  return v && typeof v === 'object' ? v : { preset: 'last_7d' };
+}
+export function setDateRange(range) {
+  writeRaw(DATE_RANGE_KEY, range || { preset: 'last_7d' });
+  emit('dateRange', range);
+  return range;
+}
+
 // ===========================================================================
 // CONFIG (thresholds, weights, team, AI settings)
 // ===========================================================================

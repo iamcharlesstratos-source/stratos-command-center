@@ -11,9 +11,9 @@ import * as metrics from '../metrics.js';
 import * as ai from '../ai.js';
 import {
   el, clear, button, pill, field, input, select, sortableTable, pageHeader, card,
-  statTile, toast, emptyState, textarea, openModal, sparkline,
+  statTile, toast, emptyState, textarea, openModal, sparkline, dateRangeControl,
 } from '../ui.js';
-import { todayStr, yesterdayStr, toNum, debounce } from '../util.js';
+import { todayStr, yesterdayStr, toNum, debounce, resolveRange, inRange } from '../util.js';
 
 let selectedDate = todayStr();
 
@@ -47,6 +47,9 @@ export function render(view) {
       button('Go to products', { variant: 'primary', onClick: () => { location.hash = '#/products'; } })));
     return;
   }
+
+  // ---- range performance (Meta-style date-range analytics) ----
+  view.appendChild(renderRangeSummary(view, cfg));
 
   const yday = yesterdayStr(selectedDate);
 
@@ -96,6 +99,97 @@ function rerender(view) { clear(view); render(view); }
 function roasTone(r, cfg) {
   const label = metrics.labelForRoas(r, cfg.thresholds);
   return label === 'Scale' ? 'good' : label === 'Observe' ? 'warn' : label === 'Kill' ? 'bad' : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Range performance — Meta-style date-range analytics + Week-over-Week deltas
+// ---------------------------------------------------------------------------
+function shiftDay(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return todayStr(d);
+}
+function dayCount(since, until) {
+  const a = new Date(`${since}T00:00:00`), b = new Date(`${until}T00:00:00`);
+  return Math.round((b - a) / 86400000) + 1;
+}
+function deltaPct(cur, prev) {
+  if (!Number.isFinite(prev) || prev === 0) return null;
+  return ((cur - prev) / Math.abs(prev)) * 100;
+}
+function deltaNode(cur, prev) {
+  const d = deltaPct(cur, prev);
+  if (d === null) return el('span', { class: 'muted', style: { fontSize: '11px' }, text: 'vs — ' });
+  const up = d >= 0;
+  return el('span', { style: { fontSize: '11px', color: up ? 'var(--good)' : 'var(--bad)' }, text: `${up ? '▲' : '▼'} ${Math.abs(d).toFixed(0)}% vs prev` });
+}
+
+function renderRangeSummary(view, cfg) {
+  const range = store.getDateRange();
+  const rr = resolveRange(range);
+  const picker = dateRangeControl({ value: range, onChange: (resolved, raw) => { store.setDateRange(raw); rerender(view); } });
+
+  const all = store.getDailyMetrics();
+  const rows = all.filter((r) => inRange(r.date, rr));
+  const agg = metrics.aggregate(rows);
+  const profit = rows.reduce((s, r) => s + metrics.profit(r, store.getProduct(r.productCode)), 0);
+
+  // Previous equal-length window (only when the range is bounded)
+  let prev = null;
+  if (rr.since && rr.until && rr.until !== '9999-12-31') {
+    const n = dayCount(rr.since, rr.until);
+    const pUntil = shiftDay(rr.since, -1);
+    const pSince = shiftDay(pUntil, -(n - 1));
+    const pRows = all.filter((r) => r.date >= pSince && r.date <= pUntil);
+    prev = { agg: metrics.aggregate(pRows), label: `${pSince} → ${pUntil}` };
+  }
+
+  const c = el('section', { class: 'card' });
+  c.appendChild(el('div', { class: 'spread', style: { alignItems: 'center', flexWrap: 'wrap', gap: '8px' } },
+    el('div', {}, el('h3', { class: 'card__title', style: { margin: 0 }, text: '📅 Range performance' }),
+      el('span', { class: 'field__hint', text: `${rr.label}${rr.since ? ` · ${rr.since} → ${rr.until === '9999-12-31' ? 'today' : rr.until}` : ''}` })),
+    picker));
+
+  if (!rows.length) {
+    c.appendChild(el('p', { class: 'muted', style: { margin: '10px 0 0' }, text: 'No daily metrics logged in this range yet.' }));
+    return c;
+  }
+
+  const tile = (label, value, sub, deltaArgs) => el('div', { class: 'stat-tile' },
+    el('div', { class: 'stat-tile__value', text: value }),
+    el('div', { class: 'stat-tile__label', text: label }),
+    deltaArgs ? el('div', { class: 'stat-tile__sub' }, deltaNode(deltaArgs[0], deltaArgs[1])) : (sub ? el('div', { class: 'stat-tile__sub', text: sub }) : null));
+
+  c.appendChild(el('div', { class: 'grid grid-4', style: { marginTop: '12px' } },
+    tile('Ad spend', metrics.fmt(agg.spend, 'peso'), `${rows.length} row(s)`, prev ? [agg.spend, prev.agg.spend] : null),
+    tile('Revenue', metrics.fmt(agg.revenue, 'peso'), null, prev ? [agg.revenue, prev.agg.revenue] : null),
+    tile('Blended ROAS', metrics.fmt(agg.roas, 'roas'), null, prev ? [agg.roas || 0, prev.agg.roas || 0] : null),
+    tile('Est. profit', metrics.fmt(profit, 'peso'), 'after COGS', null)));
+
+  // Per-product rollup over the range
+  const byCode = {};
+  for (const r of rows) {
+    (byCode[r.productCode] = byCode[r.productCode] || []).push(r);
+  }
+  const prodRows = Object.entries(byCode).map(([code, rs]) => {
+    const a = metrics.aggregate(rs);
+    const pr = rs.reduce((s, r) => s + metrics.profit(r, store.getProduct(r.productCode)), 0);
+    return { code, ...a, profit: pr, days: rs.length };
+  });
+
+  const columns = [
+    { key: 'code', label: 'Product', render: (r) => el('span', { class: 'code-badge', text: r.code || '—' }) },
+    { key: 'spend', label: 'Spend', align: 'right', sortValue: (r) => r.spend, render: (r) => metrics.fmt(r.spend, 'peso') },
+    { key: 'revenue', label: 'Revenue', align: 'right', sortValue: (r) => r.revenue, render: (r) => metrics.fmt(r.revenue, 'peso') },
+    { key: 'roas', label: 'ROAS', align: 'right', sortValue: (r) => r.roas ?? -1, cellBg: (r) => roasHeat(r.roas, cfg), render: (r) => metrics.fmt(r.roas, 'roas') },
+    { key: 'cpp', label: 'CPP', align: 'right', sortValue: (r) => r.cpp ?? Infinity, render: (r) => metrics.fmt(r.cpp, 'cpp') },
+    { key: 'purchases', label: 'Orders', align: 'right', sortValue: (r) => r.purchases, render: (r) => String(r.purchases) },
+    { key: 'profit', label: 'Profit', align: 'right', sortValue: (r) => r.profit, cellBg: (r) => profitHeat(r.profit, r.spend), render: (r) => metrics.fmt(r.profit, 'peso') },
+  ];
+  c.appendChild(el('div', { style: { marginTop: '12px' } },
+    sortableTable(columns, prodRows, { sort: { key: 'spend', dir: 'desc' }, onRowClick: (r) => { location.hash = '#/products/' + encodeURIComponent(r.code); } })));
+  if (prev) c.appendChild(el('p', { class: 'field__hint', style: { marginTop: '8px' }, text: `▲▼ compares to the previous ${dayCount(rr.since, rr.until)} day(s): ${prev.label}.` }));
+  return c;
 }
 
 // ---------------------------------------------------------------------------

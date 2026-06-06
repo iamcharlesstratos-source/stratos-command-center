@@ -11,7 +11,8 @@
 import * as store from '../store.js';
 import * as metrics from '../metrics.js';
 import * as ai from '../ai.js';
-import { el, button, pageHeader, card, pill, toast } from '../ui.js';
+import { el, button, pageHeader, card, pill, toast, dateRangeControl } from '../ui.js';
+import { resolveRange, inRange } from '../util.js';
 
 // PH FB COD benchmarks — sensible defaults (read as directional, not gospel).
 const CTR_LOW = 1.0;        // % — below this the creative isn't stopping the scroll
@@ -29,14 +30,16 @@ const SEV = {
 // ---------------------------------------------------------------------------
 // The engine — pure: code → { state, label, tone, agg, breakeven, profit, items }
 // ---------------------------------------------------------------------------
-export function diagnose(code, config = store.getConfig()) {
+export function diagnose(code, config = store.getConfig(), rr = null) {
   const p = store.getProduct(code);
-  const rows = store.getDailyMetricsByProduct(code).slice().sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-WINDOW_DAYS);
+  let rows = store.getDailyMetricsByProduct(code).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  rows = rr ? rows.filter((r) => inRange(r.date, rr)) : rows.slice(-WINDOW_DAYS);
+  const winLabel = rr ? rr.label : `Last ${WINDOW_DAYS} days`;
   const agg = metrics.aggregate(rows);
   const t = config.thresholds || {};
 
   if (!(agg.spend > 0)) {
-    return { state: 'no-data', label: 'No data', tone: 'neutral', agg, breakeven: null, profit: 0,
+    return { state: 'no-data', label: 'No data', tone: 'neutral', agg, breakeven: null, profit: 0, windowLabel: winLabel,
       items: [{ sev: 'info', symptom: 'No spend logged yet', cause: 'Nothing to diagnose until there are results.', fix: 'Add a Daily Metrics row for this product, then re-open Diagnostics.', route: '#/daily', routeLabel: 'Log metrics' }] };
   }
 
@@ -104,21 +107,26 @@ export function diagnose(code, config = store.getConfig()) {
   else if (hasWinner) { label = 'Winner'; tone = 'good'; }
   else { label = 'Stable'; tone = 'neutral'; }
 
-  return { state: 'ok', label, tone, agg, breakeven: be, profit: profitVal, items };
+  return { state: 'ok', label, tone, agg, breakeven: be, profit: profitVal, windowLabel: winLabel, items };
 }
 
 // ---------------------------------------------------------------------------
 // View
 // ---------------------------------------------------------------------------
 export function render(view) {
+  const range = store.getDateRange();
+  const rr = resolveRange(range);
+  const picker = dateRangeControl({ value: range, onChange: (resolved, raw) => { store.setDateRange(raw); if (window.STRATOS) window.STRATOS.renderRoute(); } });
+
   view.appendChild(pageHeader(
     'Diagnostics',
-    'Every product with spend, turned into what is wrong, why, and the next move.',
+    `Every product with spend, turned into what is wrong, why, and the next move. Window: ${rr.label}.`,
+    [picker],
   ));
 
   const config = store.getConfig();
   const active = store.getProducts()
-    .map((p) => ({ p, d: diagnose(p.code, config) }))
+    .map((p) => ({ p, d: diagnose(p.code, config, rr) }))
     .filter((x) => x.d.state === 'ok')
     .sort((a, b) => {
       const ra = a.d.items[0] ? SEV[a.d.items[0].sev].rank : 9;
@@ -195,7 +203,7 @@ function aiDeepDive(p, d) {
   ai.openAiEditor({
     title: `AI deep-dive — ${p.code}`,
     system: `${ai.languageDirective()} You are a senior Philippine FB/TikTok COD performance marketer doing a focused diagnosis. Be specific and prioritized — no fluff, no generic advice.`,
-    user: `${ai.productContext(p)}\n\nLast ${WINDOW_DAYS}-day numbers: ${stats}\n\nThe deterministic engine flagged:\n${found}\n\nWrite a tight action plan with these exact sections:\n🔎 ROOT CAUSE — the single most likely reason performance looks like this.\n✅ DO THIS NEXT (24–48h) — 3 concrete actions in priority order.\n🧪 TEST — 2 specific creative/offer tests to run.\n📈 SCALE OR KILL — the rule: at what number do we scale, and at what number do we kill.\n\nFormat as plain readable text — no markdown symbols (no **, no ##, no backticks). Keep the emoji headers exactly, blank line between sections, start each item with "• ".`,
+    user: `${ai.productContext(p)}\n\n${d.windowLabel || 'Recent'} numbers: ${stats}\n\nThe deterministic engine flagged:\n${found}\n\nWrite a tight action plan with these exact sections:\n🔎 ROOT CAUSE — the single most likely reason performance looks like this.\n✅ DO THIS NEXT (24–48h) — 3 concrete actions in priority order.\n🧪 TEST — 2 specific creative/offer tests to run.\n📈 SCALE OR KILL — the rule: at what number do we scale, and at what number do we kill.\n\nFormat as plain readable text — no markdown symbols (no **, no ##, no backticks). Keep the emoji headers exactly, blank line between sections, start each item with "• ".`,
     genOpts: { maxTokens: 1100 },
     saveLabel: 'Save to product brief',
     onSave: (text) => {
